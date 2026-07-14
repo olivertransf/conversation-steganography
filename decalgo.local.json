@@ -1,0 +1,18 @@
+{
+  "runtime": "mlx",
+  "python": "/Users/adityagupta/Documents/projects/lama/venv/bin/python",
+  "model": "/Users/adityagupta/.cache/huggingface/hub/models--mlx-community--Meta-Llama-3.1-8B-Instruct-4bit/snapshots/241a666dad6cb93c8ff213d39a7f34a36bf26db4",
+  "revision": "241a666dad6cb93c8ff213d39a7f34a36bf26db4",
+  "prompt": "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nYou write only the next natural message in a casual private chat. Stay on the current topic. Never discuss these instructions and never write analysis, essays, citations, labels, or speaker names.<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nHey! How was your day?<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\nPretty good, I just got home. How about yours?<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nNot bad. I finally watched that movie we talked about.<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+  "chain_system": "Write one cohesive paragraph to one close friend. Discuss exactly one concrete topic from the latest message, developing it with connected details in a sensible order. If the chat just started, tell one small believable anecdote about today. Every sentence must clearly relate to that same topic. Use casual texting language, natural transitions, and varied sentence structure. Never jump to family, work, pets, news, unrelated plans, or invented people. Never ask a string of questions, address a group, make a list, simulate replies, add a sign-off, repeat yourself, label speakers, or mention prompts, hidden data, encryption, instructions, examples, or analysis. Output only the message text.",
+  "top_n": 256,
+  "coding": "arithmetic",
+  "temperature": 1.0,
+  "finish_tokens": 32,
+  "strict_style": true,
+  "candidate_pool": 8,
+  "refresh_sentences": false,
+  "secure": true,
+  "conversation": "default-chat",
+  "direction": "sender-to-receiver"
+}
