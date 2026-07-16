@@ -2,6 +2,7 @@
 """Persistent deterministic MLX-LM backend for decalgo on Apple Silicon."""
 
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -81,6 +82,11 @@ def main():
             special.add(token_id)
     cached_tokens = None
     prompt_cache = None
+    # Snapshot of the KV state at the start of the most recent generation
+    # (after processing the prompt prefix, before any generated tokens).
+    # Reused to skip re-prefilling the identical prompt for every trial.
+    gen_start_tokens = None
+    gen_start_cache = None
 
     for line in sys.stdin:
         try:
@@ -103,11 +109,24 @@ def main():
                     raise ValueError("model context cannot be empty")
 
                 if cached_tokens is not None and ids[:-1] == cached_tokens:
-                    model_input = [ids[-1]]
+                    # Continue current generation — only decode the new token.
+                    logits = model(mx.array([[ids[-1]]]), cache=prompt_cache)[0, -1]
+                elif gen_start_tokens is not None and ids[:-1] == gen_start_tokens:
+                    # New trial with the same prompt prefix — restore the KV
+                    # snapshot so we avoid re-prefilling the whole context.
+                    prompt_cache = copy.deepcopy(gen_start_cache)
+                    logits = model(mx.array([[ids[-1]]]), cache=prompt_cache)[0, -1]
                 else:
+                    # New context: full prefill required.
                     prompt_cache = make_prompt_cache(model)
-                    model_input = ids
-                logits = model(mx.array([model_input]), cache=prompt_cache)[0, -1]
+                    gen_start_tokens = None
+                    gen_start_cache = None
+                    if len(ids) > 1:
+                        model(mx.array([ids[:-1]]), cache=prompt_cache)
+                        mx.eval()  # materialise cache before snapshotting
+                        gen_start_tokens = list(ids[:-1])
+                        gen_start_cache = copy.deepcopy(prompt_cache)
+                    logits = model(mx.array([[ids[-1]]]), cache=prompt_cache)[0, -1]
                 mx.eval(logits)
                 scores = np.asarray(logits, dtype=np.float32)
                 if special:

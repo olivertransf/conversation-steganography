@@ -509,17 +509,9 @@ func interactiveSend(ctx context.Context, out, errOut io.Writer, chain *decalgo.
 		fmt.Fprintln(errOut, "message cannot be empty")
 		return nil
 	}
-	budget, err := chain.EncodingBudget([]byte(plaintext))
-	if err != nil {
-		fmt.Fprintln(errOut, "budget failed:", err)
-		return nil
-	}
-	fmt.Fprintf(out, "Encoding budget (local only): plaintext=%d packed=%d authentication=%d framing=%d termination=%d total=%d bytes.\n",
-		budget.PlaintextBytes, budget.PackedBytes, budget.AuthenticationBytes, budget.FrameLengthBytes, budget.TerminationBytes, budget.TotalHiddenBytes)
-	fmt.Fprintf(out, "Authentication search (one boundary): hypotheses=%d effective_bits=%.1f.\n",
-		budget.BaselineAuthenticationHypotheses, budget.BaselineAuthenticationBits)
-	fmt.Fprintln(out, "Generating carrier…")
+	fmt.Fprint(out, "thinking…")
 	record, err := chain.Send(ctx, sender, []byte(plaintext))
+	fmt.Fprint(out, "\r\033[K") // clear the thinking indicator
 	if err != nil {
 		fmt.Fprintln(errOut, "send failed:", err)
 		return nil
@@ -530,9 +522,9 @@ func interactiveSend(ctx context.Context, out, errOut io.Writer, chain *decalgo.
 		return err
 	}
 	if platformMode {
-		fmt.Fprintf(out, "\nSEND THIS TEXT in the messaging app as %s:\n----- BEGIN DECALGO MESSAGE -----\n%s\n----- END DECALGO MESSAGE -----\n\n", sender, record.Encrypted)
+		fmt.Fprintf(out, "%s\n\nSend the above as %s.\n\n", record.Encrypted, sender)
 	} else {
-		fmt.Fprintf(out, "sent[%d] %s\nrecord> ", record.Index, record.From)
+		fmt.Fprintf(out, "%s\nsent[%d] %s\nrecord> ", record.Encrypted, record.Index, record.From)
 		if err := json.NewEncoder(out).Encode(record); err != nil {
 			return err
 		}

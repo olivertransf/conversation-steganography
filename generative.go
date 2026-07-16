@@ -51,6 +51,9 @@ type GenerativeConfig struct {
 	SemanticThreshold float64
 	LengthBias        float64
 	ModelFingerprint  string
+	// TokenCallback is called with each generated token's text as it is
+	// selected, providing real-time streaming of the carrier generation.
+	TokenCallback func(string)
 }
 
 // GenerativeCodec embeds framed bytes in deterministic next-token choices.
@@ -238,6 +241,9 @@ func (c *GenerativeCodec) encode(ctx context.Context, payload []byte, metrics *C
 			}
 			metrics.observe(candidates, symbol)
 			token := candidates[symbol].ID
+			if c.cfg.TokenCallback != nil {
+				c.cfg.TokenCallback(candidates[symbol].Text)
+			}
 			generated = append(generated, token)
 			contextTokens = append(contextTokens, token)
 			sinceRefresh++
@@ -284,6 +290,9 @@ func (c *GenerativeCodec) encode(ctx context.Context, payload []byte, metrics *C
 				token = candidates[bucket].ID
 			}
 			metrics.observe(candidates, selected)
+			if c.cfg.TokenCallback != nil {
+				c.cfg.TokenCallback(candidates[selected].Text)
+			}
 			generated = append(generated, token)
 			contextTokens = append(contextTokens, token)
 		}
@@ -301,6 +310,9 @@ func (c *GenerativeCodec) encode(ctx context.Context, payload []byte, metrics *C
 		token := candidates[0].ID
 		if metrics != nil {
 			metrics.FinishTokens++
+		}
+		if c.cfg.TokenCallback != nil {
+			c.cfg.TokenCallback(candidates[0].Text)
 		}
 		generated = append(generated, token)
 		contextTokens = append(contextTokens, token)

@@ -117,6 +117,14 @@ func (c *ConversationChain) SyncCode() string {
 	return fmt.Sprintf("%x", c.chain[:6])
 }
 
+// SetTokenCallback installs fn as the live-streaming callback for all
+// subsequent Send calls. Each generated token's text is forwarded to fn as
+// it is selected, giving callers real-time visibility into carrier generation.
+// Pass nil to disable streaming.
+func (c *ConversationChain) SetTokenCallback(fn func(string)) {
+	c.baseConfig.TokenCallback = fn
+}
+
 // RestorePublic rebuilds rolling prompt, index, sender counters, and hash state
 // from a previously persisted public transcript.
 func (c *ConversationChain) RestorePublic(records []ChainRecord) error {
