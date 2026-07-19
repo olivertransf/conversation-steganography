@@ -426,3 +426,21 @@ func TestSemanticHumanWritingJudge(t *testing.T) {
 		t.Fatal("judge accepted a model without explicit YES and NO scores")
 	}
 }
+
+func TestCapacityConfigAndPieceEstimate(t *testing.T) {
+	chain := newTestChain(t, "capacity")
+	chain.baseConfig.StrictStyle = true
+	chain.SetCapacityOptions(600, 32, 0)
+	cfg := chain.capacityConfig()
+	if cfg.Coding != "arithmetic" || cfg.TopN != 32 || cfg.LengthBias != 0 || cfg.CandidatePool != 32 {
+		t.Fatalf("unexpected capacity config: %#v", cfg)
+	}
+	piece := estimateMaxPieceBytes(600, 32)
+	if piece < 1 {
+		t.Fatalf("piece size %d", piece)
+	}
+	smaller := estimateMaxPieceBytes(100, 32)
+	if smaller >= piece {
+		t.Fatalf("smaller cover budget should yield smaller pieces: %d vs %d", smaller, piece)
+	}
+}

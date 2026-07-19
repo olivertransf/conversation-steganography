@@ -98,8 +98,8 @@ func NewGenerativeCodec(model LanguageModel, cfg GenerativeConfig) (*GenerativeC
 	if cfg.CandidatePool == 0 {
 		cfg.CandidatePool = 4
 	}
-	if cfg.CandidatePool < 1 || cfg.CandidatePool > 16 {
-		return nil, errors.New("candidate-pool must be between 1 and 16")
+	if cfg.CandidatePool < 1 || cfg.CandidatePool > 64 {
+		return nil, errors.New("candidate-pool must be between 1 and 64")
 	}
 	if cfg.CarrierTrials == 0 {
 		cfg.CarrierTrials = 1

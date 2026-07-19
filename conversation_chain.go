@@ -20,16 +20,25 @@ type ChainRecord struct {
 	Encrypted      string `json:"encrypted"`
 }
 
+const (
+	defaultMaxCoverChars      = 600
+	defaultCapacityTopN       = 32
+	defaultCapacityLengthBias = 0
+)
+
 // ConversationChain turns a sequence of messages from multiple senders into
 // one authenticated, ordered, rolling generative conversation.
 type ConversationChain struct {
-	model        LanguageModel
-	key          []byte
-	conversation string
-	baseConfig   GenerativeConfig
-	records      []ChainRecord
-	sequences    map[string]uint64
-	chain        [32]byte
+	model              LanguageModel
+	key                []byte
+	conversation       string
+	baseConfig         GenerativeConfig
+	records            []ChainRecord
+	sequences          map[string]uint64
+	chain              [32]byte
+	maxCoverChars      int
+	capacityTopN       int
+	capacityLengthBias float64
 }
 
 // EncodingBudget accounts for every bit embedded in a text carrier. Prompt,
@@ -108,7 +117,69 @@ func NewConversationChain(model LanguageModel, key []byte, conversation string, 
 	}
 	seed := sha256.Sum256([]byte("decalgo-group-chain-v1\x00" + conversation))
 	return &ConversationChain{model: model, key: append([]byte(nil), key...), conversation: conversation,
-		baseConfig: cfg, sequences: make(map[string]uint64), chain: seed}, nil
+		baseConfig: cfg, sequences: make(map[string]uint64), chain: seed,
+		maxCoverChars: defaultMaxCoverChars, capacityTopN: defaultCapacityTopN,
+		capacityLengthBias: defaultCapacityLengthBias}, nil
+}
+
+// SetCapacityOptions configures cover budgeting for SendMessage.
+// Zero maxCoverChars or capacityTopN keeps the current value; negative lengthBias is ignored.
+func (c *ConversationChain) SetCapacityOptions(maxCoverChars, capacityTopN int, capacityLengthBias float64) {
+	if maxCoverChars > 0 {
+		c.maxCoverChars = maxCoverChars
+	}
+	if capacityTopN >= 2 {
+		c.capacityTopN = capacityTopN
+	}
+	if capacityLengthBias >= 0 && capacityLengthBias <= 1 {
+		c.capacityLengthBias = capacityLengthBias
+	}
+}
+
+func (c *ConversationChain) MaxCoverChars() int { return c.maxCoverChars }
+
+func (c *ConversationChain) capacityConfig() GenerativeConfig {
+	cfg := c.baseConfig
+	cfg.Coding = "arithmetic"
+	cfg.TopN = c.capacityTopN
+	if cfg.TopN < 2 {
+		cfg.TopN = defaultCapacityTopN
+	}
+	cfg.LengthBias = c.capacityLengthBias
+	if cfg.StrictStyle {
+		pool := cfg.TopN
+		if pool < 8 {
+			pool = 8
+		}
+		cfg.CandidatePool = pool
+	}
+	return cfg
+}
+
+// estimateMaxPieceBytes returns a conservative max ciphertext piece size so a
+// typical encode of wire_i stays near maxCoverChars under the capacity profile.
+func estimateMaxPieceBytes(maxCoverChars, topN int) int {
+	if maxCoverChars < 1 {
+		maxCoverChars = defaultMaxCoverChars
+	}
+	if topN < 2 {
+		topN = defaultCapacityTopN
+	}
+	bitsPerToken := math.Log2(float64(topN)) / 4
+	if bitsPerToken < 1 {
+		bitsPerToken = 1
+	}
+	const charsPerToken = 4
+	const headerBudget = 16
+	tokens := maxCoverChars / charsPerToken
+	if tokens < 1 {
+		tokens = 1
+	}
+	bytes := int(float64(tokens)*bitsPerToken/8) - headerBudget
+	if bytes < 1 {
+		return 1
+	}
+	return bytes
 }
 
 func (c *ConversationChain) Records() []ChainRecord { return append([]ChainRecord(nil), c.records...) }

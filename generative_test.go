@@ -299,3 +299,15 @@ func TestStrictStyleFiltersBeforeCoding(t *testing.T) {
 		}
 	}
 }
+
+func TestCandidatePoolAllowsCapacityProfile(t *testing.T) {
+	codec, err := NewGenerativeCodec(fakeModel{"fixture-v1"}, GenerativeConfig{
+		Prompt: "P", TopN: 32, Coding: "arithmetic", CandidatePool: 32, Temperature: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if codec.Config().CandidatePool != 32 {
+		t.Fatalf("got pool %d", codec.Config().CandidatePool)
+	}
+}
