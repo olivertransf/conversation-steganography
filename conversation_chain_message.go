@@ -160,7 +160,16 @@ func (c *ConversationChain) encodeLogicalMessage(ctx context.Context, from strin
 	if trialCount == 0 {
 		trialCount = 1
 	}
+	// Logical sends only diversify via reseal trials; give a few more attempts
+	// than single-carrier Send when the config is minimal.
+	if trialCount < 4 {
+		trialCount = 4
+	}
+	strict := c.baseConfig.StrictStyle
 	var lastErr error
+	bestMargin := math.Inf(-1)
+	humanFailures := 0
+
 	for trial := 0; trial < trialCount; trial++ {
 		sealed, err := sealSIV(c.key, c.logicalAAD(from, chainBefore, seqBefore, trial, mode), packed)
 		if err != nil {
@@ -191,15 +200,11 @@ func (c *ConversationChain) encodeLogicalMessage(ctx context.Context, from strin
 			}
 			if err != nil {
 				lastErr = err
-				if strings.Contains(err.Error(), "tokenizer cannot losslessly represent") {
-					ok = false
-					break
-				}
 				ok = false
 				break
 			}
 			if metrics.VisibleCharacters > c.maxCoverChars {
-				lastErr = fmt.Errorf("cover exceeds max_cover_chars (%d > %d)", metrics.VisibleCharacters, c.maxCoverChars)
+				lastErr = fmt.Errorf("cover exceeds max_cover_chars (%d > %d); raise max_cover_chars or check the model", metrics.VisibleCharacters, c.maxCoverChars)
 				ok = false
 				break
 			}
@@ -215,23 +220,29 @@ func (c *ConversationChain) encodeLogicalMessage(ctx context.Context, from strin
 				}
 				human = semanticMargin >= codec.Config().SemanticThreshold
 			}
-			if codec.Config().StrictStyle && !human {
-				lastErr = fmt.Errorf("carrier trial %d chunk %d failed human-writing checks", trial, i)
+			if semanticMargin > bestMargin {
+				bestMargin = semanticMargin
+			}
+			if strict && !human {
+				humanFailures++
 				ok = false
 				break
 			}
-			record := ChainRecord{
+			records = append(records, ChainRecord{
 				Index:          startIndex + uint64(i),
 				From:           from,
 				SenderSequence: seqBefore + uint64(i),
 				Encrypted:      carrier,
-			}
-			records = append(records, record)
-			buffered = append(buffered, record)
+			})
+			buffered = append(buffered, records[len(records)-1])
 		}
 		if ok {
 			return records, nil
 		}
+	}
+
+	if humanFailures > 0 && lastErr == nil {
+		return nil, fmt.Errorf("none of %d carrier trials passed the human-writing checks (best semantic YES-NO margin %.3f)", trialCount, bestMargin)
 	}
 	if lastErr != nil {
 		return nil, fmt.Errorf("could not encode logical message after %d trials: %w", trialCount, lastErr)

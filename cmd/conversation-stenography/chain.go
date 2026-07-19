@@ -123,7 +123,7 @@ func runChain(mode string, args []string, in io.Reader, out, errOut io.Writer) e
 	if err != nil {
 		return err
 	}
-	chain.SetCapacityOptions(local.MaxCoverChars, local.CapacityTopN, local.CapacityLengthBias)
+	chain.SetCapacityOptions(local.MaxCoverChars, resolveCapacityTopN(local.CapacityTopN, local.TopN), local.CapacityLengthBias)
 	if err := chain.RestorePublic(state.Records); err != nil {
 		return fmt.Errorf("restore chain state: %w", err)
 	}

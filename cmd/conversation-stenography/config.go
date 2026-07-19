@@ -75,6 +75,22 @@ func defaultString(value, fallback string) string {
 	return fallback
 }
 
+// resolveCapacityTopN picks the SendMessage coding width. Explicit capacity_top_n
+// wins; otherwise use at least 32, or the configured generative top_n when denser.
+func resolveCapacityTopN(configured, baseTopN int) int {
+	const defaultCapacityTopN = 32
+	if configured >= 2 {
+		return configured
+	}
+	if baseTopN > defaultCapacityTopN {
+		return baseTopN
+	}
+	if baseTopN >= 2 {
+		return defaultCapacityTopN
+	}
+	return defaultCapacityTopN
+}
+
 func resolveSupportFile(name string) string {
 	if name == "conversation-stenography.local.json" {
 		if configured := envOr("CONVERSATION_STENOGRAPHY_CONFIG", ""); configured != "" {

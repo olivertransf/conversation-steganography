@@ -279,3 +279,15 @@ func TestSimulationRejectsSameUser(t *testing.T) {
 		t.Fatalf("expected distinct-user error, got %v", err)
 	}
 }
+
+func TestResolveCapacityTopN(t *testing.T) {
+	if got := resolveCapacityTopN(0, 256); got != 256 {
+		t.Fatalf("inherit denser base: got %d", got)
+	}
+	if got := resolveCapacityTopN(0, 8); got != 32 {
+		t.Fatalf("default floor: got %d", got)
+	}
+	if got := resolveCapacityTopN(64, 8); got != 64 {
+		t.Fatalf("explicit wins: got %d", got)
+	}
+}

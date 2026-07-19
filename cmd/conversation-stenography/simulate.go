@@ -84,12 +84,12 @@ func runSimulation(args []string, in io.Reader, out, errOut io.Writer) error {
 	if err != nil {
 		return err
 	}
-	first.SetCapacityOptions(local.MaxCoverChars, local.CapacityTopN, local.CapacityLengthBias)
+	first.SetCapacityOptions(local.MaxCoverChars, resolveCapacityTopN(local.CapacityTopN, local.TopN), local.CapacityLengthBias)
 	second, err := conversationstenography.NewConversationChain(model, key, *conversation, cfg)
 	if err != nil {
 		return err
 	}
-	second.SetCapacityOptions(local.MaxCoverChars, local.CapacityTopN, local.CapacityLengthBias)
+	second.SetCapacityOptions(local.MaxCoverChars, resolveCapacityTopN(local.CapacityTopN, local.TopN), local.CapacityLengthBias)
 	return simulateConversation(ctx, in, out, errOut, first, second, *userA, *userB)
 }
 
