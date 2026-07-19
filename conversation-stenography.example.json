@@ -21,5 +21,8 @@
   "naturalness_slack": 0.35,
   "semantic_judge": false,
   "semantic_threshold": -6,
-  "length_bias": 0.1
+  "length_bias": 0.1,
+  "max_cover_chars": 600,
+  "capacity_top_n": 32,
+  "capacity_length_bias": 0
 }

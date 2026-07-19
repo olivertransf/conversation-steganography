@@ -31,7 +31,8 @@ func interactiveChain(ctx context.Context, in io.Reader, out, errOut io.Writer, 
 		fmt.Fprintln(out)
 		fmt.Fprintln(out, "  HOW TO USE:")
 		fmt.Fprintln(out, "  • Type a message and press Enter → generates cover text to copy")
-		fmt.Fprintln(out, "  • /paste SENDER → paste a message you received from someone")
+		fmt.Fprintln(out, "  • Long messages may produce multiple covers; paste them in order")
+		fmt.Fprintln(out, "  • /paste SENDER → paste one received cover from someone")
 		fmt.Fprintln(out, "  • /help → see all commands")
 		fmt.Fprintln(out, "  • /quit → save and exit")
 		fmt.Fprintln(out)
@@ -55,12 +56,12 @@ func interactiveChain(ctx context.Context, in io.Reader, out, errOut io.Writer, 
   │                                                    │
   │  Messaging:                                        │
   │    Just type     Send a message (generates cover)  │
-  │    /paste NAME   Paste received message from NAME  │
+  │    /paste NAME   Paste one received cover from NAME│
   │    /send         Multi-line message (end with /end)│
   │                                                    │
   │  Info:                                             │
   │    /show         Show conversation history         │
-  │    /status       Show sync info                    │
+  │    /status       Show sync + pending covers        │
   │    /record N     Re-print transport record N       │
   │                                                    │
   │  Other:                                            │
@@ -70,11 +71,11 @@ func interactiveChain(ctx context.Context, in io.Reader, out, errOut io.Writer, 
 			} else {
 				fmt.Fprintln(out, `Commands:
   /as NAME          switch the local sender
-  /paste NAME       paste a raw messaging-app carrier; finish with /end
+  /paste NAME       paste one messaging-app cover; finish with /end (repeat in order)
   /send             type a multiline plaintext; finish with /end
   /receive JSON     accept a one-line record from another participant
   /show             print from|decrypted|encrypted history
-  /status           show identity, state path, and next global index
+  /status           show identity, state path, sync, and pending assemblies
   /record INDEX     print one transport record as JSON
   /quit             save and exit
 Any other line is encrypted and sent as the active participant.`)
@@ -93,6 +94,10 @@ Any other line is encrypted and sent as the active participant.`)
 			}
 		case line == "/status":
 			fmt.Fprintf(out, "conversation=%q me=%q next_index=%d sync=%s state=%s\n", state.Conversation, activeSender, len(state.Records), chain.SyncCode(), statePath)
+			for _, pending := range chain.ExportPending() {
+				mask := pendingReceivedMask(pending)
+				fmt.Fprintf(out, "  pending from %s: %s (next part %d/%d)\n", pending.From, mask, pending.NextPart+1, pending.Total)
+			}
 		case strings.HasPrefix(line, "/record "):
 			var index int
 			if _, err := fmt.Sscanf(strings.TrimSpace(strings.TrimPrefix(line, "/record ")), "%d", &index); err != nil || index < 0 || index >= len(state.Records) {
@@ -117,15 +122,24 @@ Any other line is encrypted and sent as the active participant.`)
 			if !ok {
 				return scanner.Err()
 			}
-			plaintext, accepted, err := chain.Receive(ctx, sender, carrier)
+			plaintext, done, status, err := chain.ReceiveMessage(ctx, sender, carrier)
 			if err != nil {
 				fmt.Fprintln(errOut, "  ⚠ Could not decode:", err)
 				continue
 			}
 			state.Records = chain.Records()
-			state.Decrypted[fmt.Sprint(accepted.Index)] = base64.StdEncoding.EncodeToString(plaintext)
+			state.Pending = chain.ExportPending()
+			if done {
+				if n := len(state.Records); n > 0 {
+					state.Decrypted[fmt.Sprint(state.Records[n-1].Index)] = base64.StdEncoding.EncodeToString(plaintext)
+				}
+			}
 			if err := saveChainState(statePath, *state, stateKey); err != nil {
 				return err
+			}
+			if !done {
+				fmt.Fprintf(out, "\n  Waiting for part %d/%d (sync %s).\n\n", status.Part+1, status.Total, status.SyncCode)
+				continue
 			}
 			fmt.Fprintf(out, "\n  📩 Message from %s:\n  %s\n\n", sender, plaintext)
 		case line == "/send":
@@ -148,21 +162,26 @@ Any other line is encrypted and sent as the active participant.`)
 				fmt.Fprintln(errOut, "receive failed: record metadata does not match expected order")
 				continue
 			}
-			plaintext, accepted, err := chain.Receive(ctx, incoming.From, incoming.Encrypted)
+			plaintext, done, status, err := chain.ReceiveMessage(ctx, incoming.From, incoming.Encrypted)
 			if err != nil {
 				fmt.Fprintln(errOut, "receive failed:", err)
 				continue
 			}
-			if incoming.Index != accepted.Index || incoming.SenderSequence != accepted.SenderSequence {
-				fmt.Fprintln(errOut, "receive failed: record metadata does not match expected order")
-				continue
-			}
 			state.Records = chain.Records()
-			state.Decrypted[fmt.Sprint(accepted.Index)] = base64.StdEncoding.EncodeToString(plaintext)
+			state.Pending = chain.ExportPending()
+			if done {
+				if n := len(state.Records); n > 0 {
+					state.Decrypted[fmt.Sprint(state.Records[n-1].Index)] = base64.StdEncoding.EncodeToString(plaintext)
+				}
+			}
 			if err := saveChainState(statePath, *state, stateKey); err != nil {
 				return err
 			}
-			fmt.Fprintf(out, "decrypted[%d] %s> %s\n", accepted.Index, accepted.From, plaintext)
+			if !done {
+				fmt.Fprintf(out, "waiting for part %d/%d (sync %s)\n", status.Part+1, status.Total, status.SyncCode)
+				continue
+			}
+			fmt.Fprintf(out, "decrypted %s> %s\n", incoming.From, plaintext)
 		case strings.HasPrefix(line, "/"):
 			fmt.Fprintln(errOut, "  Unknown command. Type /help to see available commands.")
 		default:
@@ -190,32 +209,56 @@ func interactiveSend(ctx context.Context, out, errOut io.Writer, chain *conversa
 		return nil
 	}
 	fmt.Fprint(out, "  ⏳ Generating cover text...")
-	record, err := chain.Send(ctx, sender, []byte(plaintext))
+	records, err := chain.SendMessage(ctx, sender, []byte(plaintext))
 	fmt.Fprint(out, "\r\033[K") // clear the thinking indicator
 	if err != nil {
 		fmt.Fprintln(errOut, "  ⚠ Send failed:", err)
 		return nil
 	}
 	state.Records = chain.Records()
-	state.Decrypted[fmt.Sprint(record.Index)] = base64.StdEncoding.EncodeToString([]byte(plaintext))
+	state.Pending = chain.ExportPending()
+	for _, record := range records {
+		state.Decrypted[fmt.Sprint(record.Index)] = base64.StdEncoding.EncodeToString([]byte(plaintext))
+	}
 	if err := saveChainState(statePath, *state, stateKey); err != nil {
 		return err
 	}
 	if platformMode {
 		fmt.Fprintln(out)
-		fmt.Fprintln(out, "  ┌─── COPY THIS into your messaging app ───┐")
-		fmt.Fprintln(out)
-		fmt.Fprintf(out, "  %s\n", record.Encrypted)
-		fmt.Fprintln(out)
+		for i, record := range records {
+			fmt.Fprintf(out, "  Cover %d/%d — copy into your messaging app:\n", i+1, len(records))
+			fmt.Fprintln(out)
+			fmt.Fprintf(out, "  %s\n", record.Encrypted)
+			fmt.Fprintln(out)
+		}
+		if len(records) > 1 {
+			if budget, budgetErr := chain.EncodingBudget([]byte(plaintext)); budgetErr == nil {
+				fmt.Fprintf(out, "  budget: packed=%d sealed=%d chunks=%d top_n capacity profile\n", budget.PackedBytes, budget.SealedBytes, budget.ChunkCount)
+			}
+		}
 		fmt.Fprintln(out, "  └─── END — send as "+sender+" ───────────────┘")
 		fmt.Fprintln(out)
 	} else {
-		fmt.Fprintf(out, "%s\nsent[%d] %s\nrecord> ", record.Encrypted, record.Index, record.From)
-		if err := json.NewEncoder(out).Encode(record); err != nil {
-			return err
+		for _, record := range records {
+			fmt.Fprintf(out, "%s\nsent[%d] %s\nrecord> ", record.Encrypted, record.Index, record.From)
+			if err := json.NewEncoder(out).Encode(record); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+func pendingReceivedMask(pending conversationstenography.PendingAssembly) string {
+	mask := make([]byte, pending.Total)
+	for i, piece := range pending.Pieces {
+		if piece != nil {
+			mask[i] = '1'
+		} else {
+			mask[i] = '0'
+		}
+	}
+	return string(mask)
 }
 
 func nextSenderSequence(records []conversationstenography.ChainRecord, from string) uint64 {

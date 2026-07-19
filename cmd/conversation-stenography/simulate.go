@@ -84,10 +84,12 @@ func runSimulation(args []string, in io.Reader, out, errOut io.Writer) error {
 	if err != nil {
 		return err
 	}
+	first.SetCapacityOptions(local.MaxCoverChars, local.CapacityTopN, local.CapacityLengthBias)
 	second, err := conversationstenography.NewConversationChain(model, key, *conversation, cfg)
 	if err != nil {
 		return err
 	}
+	second.SetCapacityOptions(local.MaxCoverChars, local.CapacityTopN, local.CapacityLengthBias)
 	return simulateConversation(ctx, in, out, errOut, first, second, *userA, *userB)
 }
 
@@ -143,21 +145,31 @@ func simulateConversation(ctx context.Context, in io.Reader, out, errOut io.Writ
 		}
 
 		fmt.Fprintln(out, "  Generating and transporting cover text...")
-		record, err := activeChain.Send(ctx, activeName, []byte(plaintext))
+		records, err := activeChain.SendMessage(ctx, activeName, []byte(plaintext))
 		if err != nil {
 			return fmt.Errorf("%s send: %w", activeName, err)
 		}
-		decoded, accepted, err := otherChain.Receive(ctx, activeName, record.Encrypted)
-		if err != nil {
-			return fmt.Errorf("%s receive: %w", otherName, err)
+		var decoded []byte
+		var done bool
+		for i, record := range records {
+			var status conversationstenography.ReceiveStatus
+			decoded, done, status, err = otherChain.ReceiveMessage(ctx, activeName, record.Encrypted)
+			if err != nil {
+				return fmt.Errorf("%s receive cover %d/%d: %w", otherName, i+1, len(records), err)
+			}
+			if i < len(records)-1 && (done || !status.Waiting) {
+				return fmt.Errorf("simulation expected waiting after cover %d/%d", i+1, len(records))
+			}
 		}
-		if accepted.Index != record.Index || accepted.SenderSequence != record.SenderSequence {
-			return errors.New("simulation participants produced mismatched chain metadata")
+		if !done {
+			return errors.New("simulation logical message incomplete after all covers")
 		}
 
 		fmt.Fprintln(out)
 		fmt.Fprintln(out, "  Cover text (what the messaging app would see):")
-		fmt.Fprintf(out, "  %s\n\n", record.Encrypted)
+		for i, record := range records {
+			fmt.Fprintf(out, "  Cover %d/%d:\n  %s\n\n", i+1, len(records), record.Encrypted)
+		}
 		fmt.Fprintf(out, "  %s decoded: %s\n\n", otherName, decoded)
 		history = append(history, fmt.Sprintf("%s → %s: %s", activeName, otherName, plaintext))
 		activeName, otherName = otherName, activeName

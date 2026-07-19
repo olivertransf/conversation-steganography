@@ -246,10 +246,12 @@ func TestSimulateConversationRoundTripAndAlternates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	alice.SetCapacityOptions(600, 8, 0)
 	bob, err := conversationstenography.NewConversationChain(simulationTestModel{}, key, "simulation", cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
+	bob.SetCapacityOptions(600, 8, 0)
 	var out, errOut bytes.Buffer
 	input := strings.NewReader("hello bob\nhello alice\n/show\n/quit\n")
 	if err := simulateConversation(context.Background(), input, &out, &errOut, alice, bob, "Alice", "Bob"); err != nil {

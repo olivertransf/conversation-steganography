@@ -30,9 +30,12 @@ type localGenerativeConfig struct {
 	RefreshSentences  bool    `json:"refresh_sentences"`
 	CarrierTrials     int     `json:"carrier_trials"`
 	NaturalnessSlack  float64 `json:"naturalness_slack"`
-	SemanticJudge     bool    `json:"semantic_judge"`
-	SemanticThreshold float64 `json:"semantic_threshold"`
-	LengthBias        float64 `json:"length_bias"`
+	SemanticJudge       bool    `json:"semantic_judge"`
+	SemanticThreshold   float64 `json:"semantic_threshold"`
+	LengthBias          float64 `json:"length_bias"`
+	MaxCoverChars       int     `json:"max_cover_chars"`
+	CapacityTopN        int     `json:"capacity_top_n"`
+	CapacityLengthBias  float64 `json:"capacity_length_bias"`
 }
 
 func loadLocalGenerativeConfig(path string) (localGenerativeConfig, error) {

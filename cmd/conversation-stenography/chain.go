@@ -24,10 +24,11 @@ import (
 // authenticated multi-party conversation chain.
 
 type persistedChainState struct {
-	Version      int                                   `json:"version"`
-	Conversation string                                `json:"conversation"`
-	Records      []conversationstenography.ChainRecord `json:"records"`
-	Decrypted    map[string]string                     `json:"decrypted,omitempty"`
+	Version      int                                         `json:"version"`
+	Conversation string                                      `json:"conversation"`
+	Records      []conversationstenography.ChainRecord       `json:"records"`
+	Decrypted    map[string]string                           `json:"decrypted,omitempty"`
+	Pending      []conversationstenography.PendingAssembly   `json:"pending,omitempty"`
 }
 
 const chainStateVersion = 2
@@ -122,8 +123,12 @@ func runChain(mode string, args []string, in io.Reader, out, errOut io.Writer) e
 	if err != nil {
 		return err
 	}
+	chain.SetCapacityOptions(local.MaxCoverChars, local.CapacityTopN, local.CapacityLengthBias)
 	if err := chain.RestorePublic(state.Records); err != nil {
 		return fmt.Errorf("restore chain state: %w", err)
+	}
+	if err := chain.RestorePending(state.Pending); err != nil {
+		return fmt.Errorf("restore pending assembly: %w", err)
 	}
 	if mode == "chain-chat" || mode == "chat" {
 		return interactiveChain(ctx, in, out, errOut, chain, &state, *statePath, *from, mode == "chat", key)
@@ -133,32 +138,41 @@ func runChain(mode string, args []string, in io.Reader, out, errOut io.Writer) e
 		return err
 	}
 	if mode == "chain-send" {
-		record, err := chain.Send(ctx, *from, data)
+		records, err := chain.SendMessage(ctx, *from, data)
 		if err != nil {
 			return err
 		}
 		state.Records = chain.Records()
-		state.Decrypted[fmt.Sprint(record.Index)] = base64.StdEncoding.EncodeToString(data)
+		state.Pending = chain.ExportPending()
+		for _, record := range records {
+			state.Decrypted[fmt.Sprint(record.Index)] = base64.StdEncoding.EncodeToString(data)
+		}
 		if err := saveChainState(*statePath, state, key); err != nil {
 			return err
 		}
-		return json.NewEncoder(out).Encode(record)
+		return json.NewEncoder(out).Encode(records)
 	}
 	var incoming conversationstenography.ChainRecord
 	if err := json.Unmarshal(data, &incoming); err != nil {
 		return fmt.Errorf("parse chain record: %w", err)
 	}
-	plaintext, accepted, err := chain.Receive(ctx, incoming.From, incoming.Encrypted)
+	plaintext, done, _, err := chain.ReceiveMessage(ctx, incoming.From, incoming.Encrypted)
 	if err != nil {
 		return err
 	}
-	if incoming.Index != accepted.Index || incoming.SenderSequence != accepted.SenderSequence {
-		return errors.New("chain record metadata does not match expected order")
-	}
 	state.Records = chain.Records()
-	state.Decrypted[fmt.Sprint(accepted.Index)] = base64.StdEncoding.EncodeToString(plaintext)
+	state.Pending = chain.ExportPending()
+	if done {
+		// Index of the last committed cover for this paste.
+		if n := len(state.Records); n > 0 {
+			state.Decrypted[fmt.Sprint(state.Records[n-1].Index)] = base64.StdEncoding.EncodeToString(plaintext)
+		}
+	}
 	if err := saveChainState(*statePath, state, key); err != nil {
 		return err
+	}
+	if !done {
+		return errors.New("logical message incomplete; paste remaining covers in order")
 	}
 	_, err = out.Write(plaintext)
 	return err

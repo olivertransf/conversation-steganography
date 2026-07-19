@@ -128,7 +128,7 @@ Just type your secret message:
 alex> Hey, can we meet tomorrow at noon?
   ⏳ Generating cover text...
 
-  ┌─── COPY THIS into your messaging app ───┐
+  Cover 1/1 — copy into your messaging app:
 
   I was thinking about trying that new place downtown.
   Have you been there before? I heard they have great pasta.
@@ -136,7 +136,7 @@ alex> Hey, can we meet tomorrow at noon?
   └─── END — send as alex ───────────────────┘
 ```
 
-Copy the cover text and paste it into WhatsApp/Telegram/Signal.
+Copy each cover into WhatsApp/Telegram/Signal in order. Longer secrets may produce multiple covers (`Cover 1/3`, `Cover 2/3`, …); paste every cover, still in order.
 
 ### 5. Receive a message
 
@@ -154,6 +154,8 @@ and said the carbonara was incredible.
   📩 Message from bob:
   Sure, noon works! See you there.
 ```
+
+If a logical message spans multiple covers, `/paste` one cover at a time in order. Incomplete assemblies print `Waiting for part 2/3 (sync …)` until the last cover arrives. `/status` shows any pending assembly.
 
 ## How It Works (for the curious)
 
@@ -203,7 +205,7 @@ Both people need the **exact same** configuration:
 3. **Exchange messages** through any messaging app — just copy/paste the cover text.
 
 > [!IMPORTANT]
-> Both people must process messages **in the exact same order** they appear in the messaging app. If you miss a message, use `/paste` to process it before sending your next reply.
+> Both people must process covers **in the exact same order** they appear in the messaging app, including every cover of a multi-cover send. If you miss a cover, use `/paste` to process it before sending your next reply.
 
 ## Commands
 
@@ -219,11 +221,11 @@ Both people need the **exact same** configuration:
 
 | Command | What it does |
 |---|---|
-| _(just type)_ | Send an encrypted message |
-| `/paste NAME` | Decode a received message from NAME |
+| _(just type)_ | Send an encrypted message (may emit multiple covers) |
+| `/paste NAME` | Decode one received cover from NAME (repeat in order) |
 | `/send` | Multi-line message (end with `/end`) |
 | `/show` | Show conversation history |
-| `/status` | Show sync info (useful for debugging) |
+| `/status` | Show sync info and any pending multi-cover assembly |
 | `/help` | List all commands |
 | `/quit` | Save and exit |
 
