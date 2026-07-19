@@ -39,6 +39,7 @@ type ConversationChain struct {
 	maxCoverChars      int
 	capacityTopN       int
 	capacityLengthBias float64
+	pending            map[string]*PendingAssembly
 }
 
 // EncodingBudget accounts for every bit embedded in a text carrier. Prompt,
@@ -158,6 +159,8 @@ func (c *ConversationChain) capacityConfig() GenerativeConfig {
 
 // estimateMaxPieceBytes returns a conservative max ciphertext piece size so a
 // typical encode of wire_i stays near maxCoverChars under the capacity profile.
+// Rate uses 0.75*log2(topN) bits/token (below flat top-n width) and ~4 visible
+// characters per token, minus a wire-header budget.
 func estimateMaxPieceBytes(maxCoverChars, topN int) int {
 	if maxCoverChars < 1 {
 		maxCoverChars = defaultMaxCoverChars
@@ -165,7 +168,7 @@ func estimateMaxPieceBytes(maxCoverChars, topN int) int {
 	if topN < 2 {
 		topN = defaultCapacityTopN
 	}
-	bitsPerToken := math.Log2(float64(topN)) / 4
+	bitsPerToken := 0.75 * math.Log2(float64(topN))
 	if bitsPerToken < 1 {
 		bitsPerToken = 1
 	}
@@ -489,16 +492,20 @@ func (c *ConversationChain) openTrials(from string, index, sequence uint64, seal
 const maxConversationDictionary = 32 << 10
 
 func (c *ConversationChain) compressionDictionary() []byte {
-	if len(c.records) == 0 {
+	return compressionDictionaryFrom(c.records)
+}
+
+func compressionDictionaryFrom(records []ChainRecord) []byte {
+	if len(records) == 0 {
 		return nil
 	}
 	capacity := len(chatDictionary)
-	for _, record := range c.records {
+	for _, record := range records {
 		capacity += len(record.Encrypted) + 1
 	}
 	dictionary := make([]byte, 0, capacity)
 	dictionary = append(dictionary, chatDictionary...)
-	for _, record := range c.records {
+	for _, record := range records {
 		dictionary = append(dictionary, '\n')
 		dictionary = append(dictionary, record.Encrypted...)
 	}

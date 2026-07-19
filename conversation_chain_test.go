@@ -1,7 +1,9 @@
 package conversationstenography
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -442,5 +444,205 @@ func TestCapacityConfigAndPieceEstimate(t *testing.T) {
 	smaller := estimateMaxPieceBytes(100, 32)
 	if smaller >= piece {
 		t.Fatalf("smaller cover budget should yield smaller pieces: %d vs %d", smaller, piece)
+	}
+}
+
+type countingNextModel struct {
+	fakeModel
+	calls int
+	limit int // fail when calls > limit; 0 means unlimited
+}
+
+func (m *countingNextModel) Next(ctx context.Context, tokens []int, n int) ([]TokenCandidate, error) {
+	m.calls++
+	if m.limit > 0 && m.calls > m.limit {
+		return nil, errors.New("forced encode failure")
+	}
+	return m.fakeModel.Next(ctx, tokens, n)
+}
+
+func newMessageTestChain(t *testing.T, conversation string, model LanguageModel) *ConversationChain {
+	t.Helper()
+	if model == nil {
+		model = fakeModel{"fixture-v1"}
+	}
+	chain, err := NewConversationChain(model, []byte("0123456789abcdef0123456789abcdef"), conversation,
+		GenerativeConfig{Prompt: "P", TopN: 8, Coding: "arithmetic", Temperature: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return chain
+}
+
+func TestSendMessageSingleChunk(t *testing.T) {
+	ctx := context.Background()
+	alice := newMessageTestChain(t, "friends", nil)
+	bob := newMessageTestChain(t, "friends", nil)
+	alice.SetCapacityOptions(600, 8, 0)
+	bob.SetCapacityOptions(600, 8, 0)
+
+	records, err := alice.SendMessage(ctx, "alice", []byte("short hi"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("want 1 cover, got %d", len(records))
+	}
+	plaintext, done, status, err := bob.ReceiveMessage(ctx, "alice", records[0].Encrypted)
+	if err != nil || !done || string(plaintext) != "short hi" {
+		t.Fatalf("got %q done=%v status=%#v err=%v", plaintext, done, status, err)
+	}
+}
+
+func TestSendMessageMultiChunkRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	alice := newMessageTestChain(t, "friends", nil)
+	bob := newMessageTestChain(t, "friends", nil)
+	// Tiny cover budget forces multiple pieces for ~2KiB plaintext.
+	alice.SetCapacityOptions(80, 8, 0)
+	bob.SetCapacityOptions(80, 8, 0)
+
+	plaintext := bytes.Repeat([]byte("the quick brown fox jumps over the lazy dog. "), 50)
+	records, err := alice.SendMessage(ctx, "alice", plaintext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) < 2 {
+		t.Fatalf("expected multiple covers, got %d", len(records))
+	}
+
+	var got []byte
+	var done bool
+	for i, record := range records {
+		var status ReceiveStatus
+		got, done, status, err = bob.ReceiveMessage(ctx, "alice", record.Encrypted)
+		if err != nil {
+			t.Fatalf("part %d: %v", i, err)
+		}
+		if i < len(records)-1 {
+			if done || !status.Waiting {
+				t.Fatalf("part %d: expected waiting, done=%v status=%#v", i, done, status)
+			}
+			continue
+		}
+		if !done || !bytes.Equal(got, plaintext) {
+			t.Fatalf("final: done=%v len(got)=%d want=%d", done, len(got), len(plaintext))
+		}
+	}
+}
+
+func TestReceiveMessageRejectsSkippedCover(t *testing.T) {
+	ctx := context.Background()
+	alice := newMessageTestChain(t, "friends", nil)
+	bob := newMessageTestChain(t, "friends", nil)
+	alice.SetCapacityOptions(80, 8, 0)
+	bob.SetCapacityOptions(80, 8, 0)
+	plaintext := bytes.Repeat([]byte("abcdefghij"), 80)
+	records, err := alice.SendMessage(ctx, "alice", plaintext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) < 2 {
+		t.Fatalf("need >=2 covers, got %d", len(records))
+	}
+	if _, _, _, err := bob.ReceiveMessage(ctx, "alice", records[0].Encrypted); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := bob.ReceiveMessage(ctx, "alice", records[2%len(records)].Encrypted); err == nil && len(records) > 2 {
+		// If only 2 covers, skipping to index 0 is duplicate; index 1 is correct next.
+	}
+	if len(records) > 2 {
+		if _, done, _, err := bob.ReceiveMessage(ctx, "alice", records[2].Encrypted); err == nil || done {
+			t.Fatal("skipped cover should error without plaintext")
+		}
+	} else {
+		// With exactly 2 covers, feeding cover 0 again is a duplicate/wrong part.
+		if _, done, _, err := bob.ReceiveMessage(ctx, "alice", records[0].Encrypted); err == nil || done {
+			t.Fatal("duplicate/skipped cover should error")
+		}
+	}
+}
+
+func TestSendMessageAllOrNothing(t *testing.T) {
+	ctx := context.Background()
+	probe := &countingNextModel{fakeModel: fakeModel{"fixture-v1"}}
+	alice := newMessageTestChain(t, "friends", probe)
+	alice.SetCapacityOptions(80, 8, 0)
+	plaintext := bytes.Repeat([]byte("abcdefghij"), 80)
+	records, err := alice.SendMessage(ctx, "alice", plaintext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) < 2 {
+		t.Fatalf("need >=2 covers to test last-chunk failure, got %d", len(records))
+	}
+	needed := probe.calls
+
+	failing := &countingNextModel{fakeModel: fakeModel{"fixture-v1"}, limit: needed / 2}
+	if failing.limit < 1 {
+		failing.limit = 1
+	}
+	alice2 := newMessageTestChain(t, "friends", failing)
+	alice2.SetCapacityOptions(80, 8, 0)
+	if _, err := alice2.SendMessage(ctx, "alice", plaintext); err == nil {
+		t.Fatal("expected encode failure")
+	}
+	if len(alice2.Records()) != 0 {
+		t.Fatalf("all-or-nothing violated: committed %d records", len(alice2.Records()))
+	}
+}
+
+func TestPendingAssemblyRestore(t *testing.T) {
+	ctx := context.Background()
+	alice := newMessageTestChain(t, "friends", nil)
+	bob := newMessageTestChain(t, "friends", nil)
+	alice.SetCapacityOptions(80, 8, 0)
+	bob.SetCapacityOptions(80, 8, 0)
+	plaintext := bytes.Repeat([]byte("pending restore "), 40)
+	records, err := alice.SendMessage(ctx, "alice", plaintext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) < 2 {
+		t.Fatalf("need >=2 covers, got %d", len(records))
+	}
+	if _, done, _, err := bob.ReceiveMessage(ctx, "alice", records[0].Encrypted); err != nil || done {
+		t.Fatalf("first part: done=%v err=%v", done, err)
+	}
+	exported := bob.ExportPending()
+	public := bob.Records()
+
+	bob2 := newMessageTestChain(t, "friends", nil)
+	bob2.SetCapacityOptions(80, 8, 0)
+	if err := bob2.RestorePublic(public); err != nil {
+		t.Fatal(err)
+	}
+	if err := bob2.RestorePending(exported); err != nil {
+		t.Fatal(err)
+	}
+	var got []byte
+	var done bool
+	for i := 1; i < len(records); i++ {
+		got, done, _, err = bob2.ReceiveMessage(ctx, "alice", records[i].Encrypted)
+		if err != nil {
+			t.Fatalf("part %d: %v", i, err)
+		}
+	}
+	if !done || !bytes.Equal(got, plaintext) {
+		t.Fatalf("restore failed: done=%v equal=%v", done, bytes.Equal(got, plaintext))
+	}
+}
+
+func TestReceiveMessageLegacyFallback(t *testing.T) {
+	ctx := context.Background()
+	alice := newMessageTestChain(t, "friends", nil)
+	bob := newMessageTestChain(t, "friends", nil)
+	record, err := alice.Send(ctx, "alice", []byte("legacy path"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, done, _, err := bob.ReceiveMessage(ctx, "alice", record.Encrypted)
+	if err != nil || !done || string(got) != "legacy path" {
+		t.Fatalf("legacy fallback: %q done=%v err=%v", got, done, err)
 	}
 }
