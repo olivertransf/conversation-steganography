@@ -183,12 +183,14 @@ func estimateMaxPieceBytes(maxCoverChars, topN int) int {
 	if topN < 2 {
 		topN = defaultCapacityTopN
 	}
-	bitsPerToken := 0.75 * math.Log2(float64(topN))
+	// Conservative rate: real covers also spend visible chars on finish tokens
+	// and tokenizer expansion, so under-estimate bits/token vs flat top-n width.
+	bitsPerToken := 0.5 * math.Log2(float64(topN))
 	if bitsPerToken < 1 {
 		bitsPerToken = 1
 	}
-	const charsPerToken = 4
-	const headerBudget = 16
+	const charsPerToken = 5
+	const headerBudget = 24
 	tokens := maxCoverChars / charsPerToken
 	if tokens < 1 {
 		tokens = 1

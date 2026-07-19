@@ -291,3 +291,10 @@ func TestResolveCapacityTopN(t *testing.T) {
 		t.Fatalf("explicit wins: got %d", got)
 	}
 }
+
+func TestSimulateRejectsSecretAndDevSecret(t *testing.T) {
+	err := run([]string{"simulate", "-dev-secret", "-secret", "x", "-user-a", "A", "-user-b", "B"}, strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "either -dev-secret or -secret") {
+		t.Fatalf("expected flag conflict, got %v", err)
+	}
+}

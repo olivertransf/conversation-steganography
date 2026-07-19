@@ -93,6 +93,11 @@ Names and the test conversation can be customized:
 
 ```sh
 ./conversation-stenography simulate -user-a Alex -user-b Samir -conversation test-chat
+
+# Skip the phrase prompt for local testing:
+./conversation-stenography simulate -dev-secret
+# Or pass an explicit phrase:
+./conversation-stenography simulate -secret 'my test phrase'
 ```
 
 ### 3. Start chatting

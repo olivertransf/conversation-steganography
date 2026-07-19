@@ -31,8 +31,17 @@ func generativeKey() ([]byte, error) {
 // shared secret phrase (CONVERSATION_STENOGRAPHY_SECRET, or an interactive prompt) over the
 // legacy CONVERSATION_STENOGRAPHY_KEY.
 func conversationKey(conversation string, allowPrompt bool, errOut io.Writer) ([]byte, error) {
-	phrase := envOr("CONVERSATION_STENOGRAPHY_SECRET", "")
+	return conversationKeyPhrase(conversation, "", allowPrompt, errOut)
+}
+
+// conversationKeyPhrase is like conversationKey but uses phrase when non-empty
+// (skips env and interactive prompt for the phrase).
+func conversationKeyPhrase(conversation, phrase string, allowPrompt bool, errOut io.Writer) ([]byte, error) {
+	phrase = strings.TrimSpace(phrase)
 	keyText := strings.TrimSpace(envOr("CONVERSATION_STENOGRAPHY_KEY", ""))
+	if phrase == "" {
+		phrase = envOr("CONVERSATION_STENOGRAPHY_SECRET", "")
+	}
 	if phrase == "" && allowPrompt && keyText == "" {
 		tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 		if err != nil {
@@ -64,3 +73,6 @@ func conversationKey(conversation string, allowPrompt bool, errOut io.Writer) ([
 	}
 	return nil, errors.New("set CONVERSATION_STENOGRAPHY_SECRET to the physically shared phrase (or CONVERSATION_STENOGRAPHY_KEY)")
 }
+
+// simulateDevSecret is a fixed phrase for local simulate only. Never use for real chats.
+const simulateDevSecret = "local-dev-only-not-for-real-chat"

@@ -25,6 +25,8 @@ func runSimulation(args []string, in io.Reader, out, errOut io.Writer) error {
 	userA := fs.String("user-a", "Alice", "first simulated participant")
 	userB := fs.String("user-b", "Bob", "second simulated participant")
 	conversation := fs.String("conversation", "local-simulation", "simulation conversation identifier")
+	secret := fs.String("secret", "", "shared phrase (skips prompt; overrides env)")
+	devSecret := fs.Bool("dev-secret", false, "use built-in local-dev phrase (skips prompt; not for real chats)")
 	modelName := fs.String("model", envOr("CONVERSATION_STENOGRAPHY_MODEL", local.Model), "Hugging Face model name or local directory")
 	revision := fs.String("revision", envOr("CONVERSATION_STENOGRAPHY_REVISION", defaultString(local.Revision, "main")), "pinned model revision")
 	python := fs.String("python", envOr("CONVERSATION_STENOGRAPHY_PYTHON", defaultString(local.Python, "python3")), "Python interpreter")
@@ -34,6 +36,9 @@ func runSimulation(args []string, in io.Reader, out, errOut io.Writer) error {
 	}
 	if fs.NArg() != 0 {
 		return errors.New("simulate does not accept positional arguments")
+	}
+	if *devSecret && strings.TrimSpace(*secret) != "" {
+		return errors.New("use either -dev-secret or -secret, not both")
 	}
 	*userA = strings.TrimSpace(*userA)
 	*userB = strings.TrimSpace(*userB)
@@ -50,7 +55,12 @@ func runSimulation(args []string, in io.Reader, out, errOut io.Writer) error {
 		return errors.New("-model is required (run 'conversation-stenography setup' first)")
 	}
 
-	key, err := conversationKey(*conversation, true, errOut)
+	phrase := strings.TrimSpace(*secret)
+	if *devSecret {
+		phrase = simulateDevSecret
+		fmt.Fprintln(errOut, "Using -dev-secret local phrase (not for real chats).")
+	}
+	key, err := conversationKeyPhrase(*conversation, phrase, phrase == "", errOut)
 	if err != nil {
 		return err
 	}

@@ -9,6 +9,10 @@ import (
 	"strings"
 )
 
+// errCoverTooLong means a generated cover exceeded MaxCoverChars; callers may
+// shrink the piece budget and retry.
+var errCoverTooLong = errors.New("cover exceeds max_cover_chars")
+
 // ReceiveStatus reports progress while assembling a multi-cover logical message.
 type ReceiveStatus struct {
 	Waiting      bool
@@ -136,18 +140,22 @@ func (c *ConversationChain) SendMessage(ctx context.Context, from string, plaint
 	}
 
 	maxPiece := estimateMaxPieceBytes(c.maxCoverChars, c.capacityTopN)
-	records, err := c.encodeLogicalMessage(ctx, from, mode, packed, chainBefore, seqBefore, startIndex, maxPiece)
-	if err != nil && strings.Contains(err.Error(), "cover exceeds max_cover_chars") {
-		shrunk := maxPiece / 2
-		if shrunk < 1 {
-			shrunk = 1
+	var records []ChainRecord
+	for {
+		records, err = c.encodeLogicalMessage(ctx, from, mode, packed, chainBefore, seqBefore, startIndex, maxPiece)
+		if err == nil {
+			break
 		}
-		if shrunk != maxPiece {
-			records, err = c.encodeLogicalMessage(ctx, from, mode, packed, chainBefore, seqBefore, startIndex, shrunk)
+		if !errors.Is(err, errCoverTooLong) {
+			return nil, err
 		}
-	}
-	if err != nil {
-		return nil, err
+		if maxPiece <= 1 {
+			return nil, fmt.Errorf("%w; raise max_cover_chars or check the model", err)
+		}
+		maxPiece = maxPiece / 2
+		if maxPiece < 1 {
+			maxPiece = 1
+		}
 	}
 	for _, record := range records {
 		c.commit(record)
@@ -204,9 +212,8 @@ func (c *ConversationChain) encodeLogicalMessage(ctx context.Context, from strin
 				break
 			}
 			if metrics.VisibleCharacters > c.maxCoverChars {
-				lastErr = fmt.Errorf("cover exceeds max_cover_chars (%d > %d); raise max_cover_chars or check the model", metrics.VisibleCharacters, c.maxCoverChars)
-				ok = false
-				break
+				// Piece budget is too large; reseal trials will not fix this.
+				return nil, fmt.Errorf("%w (%d > %d)", errCoverTooLong, metrics.VisibleCharacters, c.maxCoverChars)
 			}
 			human := humanWrittenCarrier(carrier)
 			semanticMargin := math.Inf(1)
