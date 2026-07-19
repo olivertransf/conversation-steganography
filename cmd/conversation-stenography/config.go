@@ -12,30 +12,30 @@ import (
 // localGenerativeConfig mirrors conversation-stenography.local.json, the optional local
 // defaults file for the generative and conversation-chain subcommands.
 type localGenerativeConfig struct {
-	Runtime           string  `json:"runtime"`
-	Python            string  `json:"python"`
-	Model             string  `json:"model"`
-	Revision          string  `json:"revision"`
-	Prompt            string  `json:"prompt"`
-	TopN              int     `json:"top_n"`
-	Coding            string  `json:"coding"`
-	Temperature       float64 `json:"temperature"`
-	Secure            bool    `json:"secure"`
-	Conversation      string  `json:"conversation"`
-	Direction         string  `json:"direction"`
-	FinishTokens      int     `json:"finish_tokens"`
-	ChainSystem       string  `json:"chain_system"`
-	StrictStyle       bool    `json:"strict_style"`
-	CandidatePool     int     `json:"candidate_pool"`
-	RefreshSentences  bool    `json:"refresh_sentences"`
-	CarrierTrials     int     `json:"carrier_trials"`
-	NaturalnessSlack  float64 `json:"naturalness_slack"`
-	SemanticJudge       bool    `json:"semantic_judge"`
-	SemanticThreshold   float64 `json:"semantic_threshold"`
-	LengthBias          float64 `json:"length_bias"`
-	MaxCoverChars       int     `json:"max_cover_chars"`
-	CapacityTopN        int     `json:"capacity_top_n"`
-	CapacityLengthBias  float64 `json:"capacity_length_bias"`
+	Runtime            string  `json:"runtime"`
+	Python             string  `json:"python"`
+	Model              string  `json:"model"`
+	Revision           string  `json:"revision"`
+	Prompt             string  `json:"prompt"`
+	TopN               int     `json:"top_n"`
+	Coding             string  `json:"coding"`
+	Temperature        float64 `json:"temperature"`
+	Secure             bool    `json:"secure"`
+	Conversation       string  `json:"conversation"`
+	Direction          string  `json:"direction"`
+	FinishTokens       int     `json:"finish_tokens"`
+	ChainSystem        string  `json:"chain_system"`
+	StrictStyle        bool    `json:"strict_style"`
+	CandidatePool      int     `json:"candidate_pool"`
+	RefreshSentences   bool    `json:"refresh_sentences"`
+	CarrierTrials      int     `json:"carrier_trials"`
+	NaturalnessSlack   float64 `json:"naturalness_slack"`
+	SemanticJudge      bool    `json:"semantic_judge"`
+	SemanticThreshold  float64 `json:"semantic_threshold"`
+	LengthBias         float64 `json:"length_bias"`
+	MaxCoverChars      int     `json:"max_cover_chars"`
+	CapacityTopN       int     `json:"capacity_top_n"`
+	CapacityLengthBias float64 `json:"capacity_length_bias"`
 }
 
 func loadLocalGenerativeConfig(path string) (localGenerativeConfig, error) {

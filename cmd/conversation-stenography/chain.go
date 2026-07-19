@@ -24,11 +24,11 @@ import (
 // authenticated multi-party conversation chain.
 
 type persistedChainState struct {
-	Version      int                                         `json:"version"`
-	Conversation string                                      `json:"conversation"`
-	Records      []conversationstenography.ChainRecord       `json:"records"`
-	Decrypted    map[string]string                           `json:"decrypted,omitempty"`
-	Pending      []conversationstenography.PendingAssembly   `json:"pending,omitempty"`
+	Version      int                                       `json:"version"`
+	Conversation string                                    `json:"conversation"`
+	Records      []conversationstenography.ChainRecord     `json:"records"`
+	Decrypted    map[string]string                         `json:"decrypted,omitempty"`
+	Pending      []conversationstenography.PendingAssembly `json:"pending,omitempty"`
 }
 
 const chainStateVersion = 2
