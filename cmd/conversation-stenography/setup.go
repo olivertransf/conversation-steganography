@@ -78,7 +78,7 @@ func defaultPromptForModel(m modelChoice) string {
 // defaultChainSystemForModel returns a reasonable default chain_system prompt.
 func defaultChainSystemForModel(m modelChoice) string {
 	if strings.Contains(strings.ToLower(m.HuggingFace), "llama") {
-		return "Write a short, natural reply to a close friend — 2 to 4 sentences, one topic, casual language. If the chat just started, share one small detail about your day. At most one question. No lists, labels, sign-offs, or repetition. Output only the message text."
+		return "Write a natural chat message to a close friend in casual language. Topic can be anything ordinary. Prefer 2 to 5 sentences with concrete detail. If sending right after your own prior message, advance that thought — do not rephrase it. At most one question. No lists, labels, sign-offs, or repetition. Output only the message text."
 	}
 	return ""
 }

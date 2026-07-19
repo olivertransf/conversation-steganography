@@ -403,6 +403,11 @@ func (c *ConversationChain) usesUnframedArithmetic() bool {
 
 func (c *ConversationChain) messageConfig(from string) GenerativeConfig {
 	cfg := c.baseConfig
+	continuation := sameSenderContinuation(c.records, from)
+	system := cfg.ChainSystem
+	if continuation && system != "" {
+		system += "\n\nImportant: this is a back-to-back follow-up from the same person. Advance one coherent thought with new content; do not rewrite the prior message in different words."
+	}
 	if cfg.ChainSystem != "" {
 		var transcript strings.Builder
 		if len(c.records) == 0 {
@@ -414,8 +419,9 @@ func (c *ConversationChain) messageConfig(from string) GenerativeConfig {
 				transcript.WriteString("\n\n")
 			}
 		}
-		transcript.WriteString("\nWrite only one natural reply by the current participant. Do not include a name, label, signature, or transcript.")
-		cfg.Prompt = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" + cfg.ChainSystem +
+		transcript.WriteString("\n")
+		transcript.WriteString(carrierReplyInstruction(continuation))
+		cfg.Prompt = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" + system +
 			"<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n" + transcript.String() +
 			"<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
 		return cfg
@@ -427,9 +433,21 @@ func (c *ConversationChain) messageConfig(from string) GenerativeConfig {
 		prompt.WriteString(record.Encrypted)
 		prompt.WriteString("\n\n")
 	}
-	prompt.WriteString("Write only one natural unlabeled reply: ")
+	prompt.WriteString(carrierReplyInstruction(continuation))
+	prompt.WriteString(" ")
 	cfg.Prompt = prompt.String()
 	return cfg
+}
+
+func sameSenderContinuation(records []ChainRecord, from string) bool {
+	return len(records) > 0 && records[len(records)-1].From == from
+}
+
+func carrierReplyInstruction(continuation bool) string {
+	if continuation {
+		return "The current participant is sending another message immediately after their own previous one. Continue as one coherent train of thought with a new beat — fresh detail, small tangent, or next step. Topic can be anything ordinary. Do not rephrase the previous message or reuse its sentence pattern. Write only the message text: no name, label, signature, or transcript."
+	}
+	return "Write only one natural chat message by the current participant. Topic can be anything ordinary (plans, food, work, a random observation). Prefer concrete detail over generic small talk. Do not include a name, label, signature, or transcript."
 }
 
 func escapePromptControl(text string) string { return strings.ReplaceAll(text, "<|", "< |") }

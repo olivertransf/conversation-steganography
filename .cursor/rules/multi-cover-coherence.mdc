@@ -1,0 +1,8 @@
+---
+description: Multi-cover carriers should continue one thought
+alwaysApply: true
+---
+
+# Multi-cover prompt coherence
+
+When one logical send produces multiple covers, later covers use a same-sender continuation prompt (detected via trailing transcript records from that sender). Instructions must tell the model to advance a coherent thought with new content, not rephrase the prior cover. Encode and decode stay aligned because both derive the cue from the public transcript, not from part/total in the prompt.

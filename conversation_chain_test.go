@@ -703,3 +703,27 @@ func TestCapacityProfileDensitySmoke(t *testing.T) {
 		t.Fatalf("higher top_n produced smaller pieces: %d < %d", highPiece, lowPiece)
 	}
 }
+
+func TestContinuationPromptAdvancesThought(t *testing.T) {
+	chain := newTestChain(t, "friends")
+	chain.baseConfig.ChainSystem = "Write a casual reply."
+	open := chain.messageConfig("alice").Prompt
+	if !strings.Contains(open, "Topic can be anything ordinary") {
+		t.Fatalf("opening prompt missing variety cue: %q", open)
+	}
+	if strings.Contains(open, "back-to-back follow-up") {
+		t.Fatalf("opening prompt should not use continuation cue: %q", open)
+	}
+	chain.records = []ChainRecord{{From: "alice", Encrypted: "I grabbed coffee on the way in."}}
+	cont := chain.messageConfig("alice").Prompt
+	if !strings.Contains(cont, "coherent train of thought") || !strings.Contains(cont, "back-to-back follow-up") {
+		t.Fatalf("continuation prompt missing cues: %q", cont)
+	}
+	if strings.Contains(cont, "alice") {
+		t.Fatalf("sender name leaked into continuation prompt")
+	}
+	other := chain.messageConfig("bob").Prompt
+	if strings.Contains(other, "coherent train of thought") {
+		t.Fatalf("other sender should not get continuation cue: %q", other)
+	}
+}
