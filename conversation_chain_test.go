@@ -437,6 +437,11 @@ func TestCapacityConfigAndPieceEstimate(t *testing.T) {
 	if cfg.Coding != "arithmetic" || cfg.TopN != 32 || cfg.LengthBias != 0 || cfg.CandidatePool != 32 {
 		t.Fatalf("unexpected capacity config: %#v", cfg)
 	}
+	chain.SetCapacityOptions(600, 256, 0)
+	cfg = chain.capacityConfig()
+	if cfg.TopN != 256 || cfg.CandidatePool != 64 {
+		t.Fatalf("candidate pool should clamp at 64 for large top_n: %#v", cfg)
+	}
 	piece := estimateMaxPieceBytes(600, 32)
 	if piece < 1 {
 		t.Fatalf("piece size %d", piece)

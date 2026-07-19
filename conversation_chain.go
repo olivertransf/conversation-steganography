@@ -164,6 +164,9 @@ func (c *ConversationChain) capacityConfig() GenerativeConfig {
 		if pool < 8 {
 			pool = 8
 		}
+		if pool > 64 {
+			pool = 64
+		}
 		cfg.CandidatePool = pool
 	}
 	return cfg
