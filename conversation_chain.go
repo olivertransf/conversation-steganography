@@ -54,6 +54,9 @@ type EncodingBudget struct {
 	TotalHiddenBytes                 int
 	BaselineAuthenticationHypotheses int
 	BaselineAuthenticationBits       float64
+	SealedBytes                      int
+	ChunkCount                       int
+	MaxCoverChars                    int
 }
 
 const maxAuthenticationHypotheses = 1 << 15
@@ -95,7 +98,15 @@ func (c *ConversationChain) EncodingBudget(plaintext []byte) (EncodingBudget, er
 	}
 	authenticationBits := effectiveAuthenticationBits(hypotheses)
 	sealedBytes := authenticationBytes + len(packed)
-	if !c.usesUnframedArithmetic() {
+	maxPiece := estimateMaxPieceBytes(c.maxCoverChars, c.capacityTopN)
+	chunkCount := 1
+	if sealedBytes > 0 {
+		chunkCount = (sealedBytes + maxPiece - 1) / maxPiece
+	}
+	// Wire headers are outside the sealed blob; unframed arithmetic still embeds
+	// the wire (including headers) without a separate length frame.
+	capCfg := c.capacityConfig()
+	if !(capCfg.Coding == "arithmetic" && !capCfg.RefreshSentences) {
 		frameLengthBytes = binary.PutUvarint(make([]byte, binary.MaxVarintLen64), uint64(sealedBytes))
 	}
 	return EncodingBudget{
@@ -103,6 +114,7 @@ func (c *ConversationChain) EncodingBudget(plaintext []byte) (EncodingBudget, er
 		FrameLengthBytes: frameLengthBytes, TerminationBytes: 0,
 		TotalHiddenBytes:                 frameLengthBytes + sealedBytes,
 		BaselineAuthenticationHypotheses: hypotheses, BaselineAuthenticationBits: authenticationBits,
+		SealedBytes: sealedBytes, ChunkCount: chunkCount, MaxCoverChars: c.maxCoverChars,
 	}, nil
 }
 

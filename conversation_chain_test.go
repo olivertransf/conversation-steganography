@@ -646,3 +646,47 @@ func TestReceiveMessageLegacyFallback(t *testing.T) {
 		t.Fatalf("legacy fallback: %q done=%v err=%v", got, done, err)
 	}
 }
+
+func TestEncodingBudgetReportsChunks(t *testing.T) {
+	chain := newTestChain(t, "budget-chunks")
+	chain.SetCapacityOptions(80, 8, 0)
+	message := bytes.Repeat([]byte("budget chunk fields "), 40)
+	budget, err := chain.EncodingBudget(message)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if budget.SealedBytes != budget.PackedBytes+budget.AuthenticationBytes {
+		t.Fatalf("sealed bytes: %#v", budget)
+	}
+	if budget.ChunkCount < 1 || budget.MaxCoverChars != 80 {
+		t.Fatalf("chunk fields: %#v", budget)
+	}
+	if budget.TotalHiddenBytes != budget.PackedBytes+budget.AuthenticationBytes+budget.FrameLengthBytes+budget.TerminationBytes {
+		t.Fatalf("budget does not add up: %#v", budget)
+	}
+}
+
+func TestCapacityProfileDensitySmoke(t *testing.T) {
+	plaintext := bytes.Repeat([]byte("density smoke plaintext "), 60)
+	low := newTestChain(t, "density-low")
+	low.SetCapacityOptions(200, 8, 0.1)
+	high := newTestChain(t, "density-high")
+	high.SetCapacityOptions(200, 32, 0)
+	lowBudget, err := low.EncodingBudget(plaintext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	highBudget, err := high.EncodingBudget(plaintext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Soft assertion: higher top_n should not require more chunks for the same cover budget.
+	if highBudget.ChunkCount > lowBudget.ChunkCount {
+		t.Fatalf("capacity profile used more chunks (%d) than sparse profile (%d)", highBudget.ChunkCount, lowBudget.ChunkCount)
+	}
+	lowPiece := estimateMaxPieceBytes(200, 8)
+	highPiece := estimateMaxPieceBytes(200, 32)
+	if highPiece < lowPiece {
+		t.Fatalf("higher top_n produced smaller pieces: %d < %d", highPiece, lowPiece)
+	}
+}
