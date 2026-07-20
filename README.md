@@ -127,6 +127,13 @@ Then exchange cover text through any app. Process covers in the same order they 
 
 ## How it works
 
+Interactive walkthrough (pipeline stages, public vs private, token-selection lab):
+
+```sh
+open website/index.html
+# or serve: python3 -m http.server -d website 8080
+```
+
 ```
 Your secret message
         ↓

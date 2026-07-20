@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Conversation Stenography — How it works</title>
+  <meta name="description" content="An interactive walkthrough of how Conversation Stenography hides encrypted secrets inside ordinary chat text." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip" href="#walkthrough">Skip to walkthrough</a>
+
+  <header class="hero">
+    <div class="hero-atmosphere" aria-hidden="true"></div>
+    <div class="hero-inner">
+      <p class="brand">Conversation Stenography</p>
+      <h1>What looks like chat is a sealed secret.</h1>
+      <p class="lede">
+        Two people agree on a phrase. One types a private message. A local model
+        turns the ciphertext into ordinary-looking text. The messaging app only
+        ever sees the cover.
+      </p>
+      <div class="hero-actions">
+        <a class="btn primary" href="#walkthrough">Walk the pipeline</a>
+        <a class="btn ghost" href="#visibility">Public vs private</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="strip" aria-label="Pipeline overview">
+      <ol class="flow-strip" id="flow-strip">
+        <li data-step="0"><span>Phrase</span></li>
+        <li data-step="1"><span>Pack</span></li>
+        <li data-step="2"><span>Seal</span></li>
+        <li data-step="3"><span>Chunk</span></li>
+        <li data-step="4"><span>Encode</span></li>
+        <li data-step="5"><span>Commit</span></li>
+        <li data-step="6"><span>Channel</span></li>
+        <li data-step="7"><span>Decode</span></li>
+      </ol>
+    </section>
+
+    <section id="walkthrough" class="walkthrough">
+      <div class="walk-layout">
+        <aside class="step-nav" aria-label="Pipeline stages">
+          <p class="aside-label">Stages</p>
+          <ol id="step-list"></ol>
+        </aside>
+
+        <article class="step-panel" id="step-panel" aria-live="polite">
+          <div class="step-meta">
+            <p class="step-kicker" id="step-kicker"></p>
+            <div class="step-controls">
+              <button type="button" class="btn ghost compact" id="prev-step">Previous</button>
+              <button type="button" class="btn primary compact" id="next-step">Next</button>
+            </div>
+          </div>
+          <h2 id="step-title"></h2>
+          <p class="step-summary" id="step-summary"></p>
+
+          <div class="viz" id="step-viz" aria-hidden="false"></div>
+
+          <div class="detail-grid">
+            <div>
+              <h3>What happens</h3>
+              <div id="step-detail"></div>
+            </div>
+            <div>
+              <h3>Why it matters</h3>
+              <div id="step-why"></div>
+              <h3 class="spaced">Code landmarks</h3>
+              <ul class="code-list" id="step-files"></ul>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="visibility" class="visibility">
+      <div class="section-inner">
+        <h2>What stays private vs what leaves the device</h2>
+        <p class="section-lede">
+          The messaging app, and anyone reading the chat, only see cover paragraphs.
+          Ciphertext, keys, and packing modes never appear as headers in the bubble.
+        </p>
+        <div class="vis-table" role="table" aria-label="Public versus private data">
+          <div class="vis-row head" role="row">
+            <div role="columnheader">Stage</div>
+            <div role="columnheader">Private</div>
+            <div role="columnheader">Public</div>
+          </div>
+          <div class="vis-row" role="row">
+            <div role="cell">Shared phrase</div>
+            <div role="cell">Phrase and derived 32-byte key</div>
+            <div role="cell">Conversation name (used as salt)</div>
+          </div>
+          <div class="vis-row" role="row">
+            <div role="cell">Pack + seal</div>
+            <div role="cell">Plaintext, packed bytes, AES-SIV ciphertext</div>
+            <div role="cell">Protocol labels and dictionaries (not secret)</div>
+          </div>
+          <div class="vis-row" role="row">
+            <div role="cell">Generative encode</div>
+            <div role="cell">Hidden wire bits selecting tokens</div>
+            <div role="cell">Cover text and prior covers in the prompt</div>
+          </div>
+          <div class="vis-row" role="row">
+            <div role="cell">Messaging app</div>
+            <div role="cell">Nothing cryptographic</div>
+            <div role="cell">Ordinary-looking chat bubbles, in order</div>
+          </div>
+          <div class="vis-row" role="row">
+            <div role="cell">Local state file</div>
+            <div role="cell">Decrypted history under AES-GCM (<code>DCS1</code>)</div>
+            <div role="cell">Encrypted envelope on disk only</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="token-lab" class="token-lab">
+      <div class="section-inner">
+        <h2>Token selection lab</h2>
+        <p class="section-lede">
+          At each step the local model proposes likely next tokens. An arithmetic
+          coder spends secret bits to pick among the top candidates, so the cover
+          stays fluent while carrying ciphertext.
+        </p>
+        <div class="lab">
+          <div class="lab-controls">
+            <label>
+              Secret bit stream
+              <input id="bit-input" type="text" value="10110010" maxlength="16" spellcheck="false" />
+            </label>
+            <button type="button" class="btn primary compact" id="run-lab">Step once</button>
+            <button type="button" class="btn ghost compact" id="reset-lab">Reset</button>
+          </div>
+          <p class="lab-status" id="lab-status">Press Step once to pick the next cover token from the candidate pool.</p>
+          <ol class="candidate-list" id="candidate-list"></ol>
+          <p class="cover-build">Cover so far: <span id="cover-so-far">…</span></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="checklist" class="checklist">
+      <div class="section-inner">
+        <h2>Peer checklist</h2>
+        <p class="section-lede">Decode fails if either side drifts from the shared protocol surface.</p>
+        <ul class="check-grid">
+          <li>
+            <strong>Same secret phrase</strong>
+            <span>Agree in person. Never send the phrase over the chat you are hiding in.</span>
+          </li>
+          <li>
+            <strong>Same conversation name</strong>
+            <span>Used as PBKDF2 salt and bound into authenticated data.</span>
+          </li>
+          <li>
+            <strong>Same model + revision</strong>
+            <span>Token ids and fingerprints must match on both machines.</span>
+          </li>
+          <li>
+            <strong>Same generative settings</strong>
+            <span>Coding mode, top-n, prompts, strict style, trials — easiest if both run setup the same way.</span>
+          </li>
+          <li>
+            <strong>Exact cover text</strong>
+            <span>No autocorrect, smart quotes, or reordering. Paste parts in order.</span>
+          </li>
+          <li>
+            <strong>Local-only models</strong>
+            <span>No cloud API for covers. Weights stay on the device.</span>
+          </li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="section-inner footer-inner">
+      <p><span class="brand-inline">Conversation Stenography</span> — open the repo and run <code>simulate -dev-secret -manual</code> to feel the copy/paste loop.</p>
+      <p><a href="https://github.com/olivertransf/conversation-steganography">GitHub</a> · <a href="../README.md">README</a></p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
