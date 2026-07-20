@@ -134,6 +134,8 @@ open website/index.html
 # or serve: python3 -m http.server -d website 8080
 ```
 
+**GitHub Pages:** Settings → Pages → Source → **GitHub Actions** (not “Deploy from a branch”). Branch deploy only offers `/` or `/docs`; this repo publishes `website/` via `.github/workflows/pages.yml`. After the workflow runs, the site is at `https://olivertransf.github.io/conversation-steganography/`.
+
 ```
 Your secret message
         ↓
