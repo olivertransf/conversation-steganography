@@ -90,7 +90,7 @@ a {
     linear-gradient(rgba(232, 238, 244, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(232, 238, 244, 0.05) 1px, transparent 1px);
   background-size: 48px 48px;
-  mask-image: radial-gradient(circle at 30% 40%, #000 20%, transparent 75%);
+  mask-image: radial-gradient(circle at 50% 42%, #000 18%, transparent 72%);
   animation: grid-drift 28s linear infinite;
 }
 
@@ -114,20 +114,24 @@ a {
   font-weight: 800;
   font-size: clamp(2.35rem, 6.2vw, 3.9rem);
   line-height: 0.98;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   width: fit-content;
   max-width: 100%;
-  /* Syne + tracking: last-glyph spacing makes the block look left-shifted */
-  padding-inline-start: 0.02em;
+  /* Syne’s open C + wide sidebearings read left-heavy when box-centered */
+  transform: translateX(0.18em);
 }
 
 .brand span {
   display: block;
+  width: max-content;
+  max-width: 100%;
   text-align: center;
-  width: 100%;
+  letter-spacing: -0.015em;
+  /* cancel trailing letter-spacing so the ink box matches visual center */
+  margin-inline-end: -0.015em;
 }
 
 .hero h1 {
