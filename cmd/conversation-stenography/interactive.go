@@ -225,17 +225,18 @@ func interactiveSend(ctx context.Context, out, errOut io.Writer, chain *conversa
 	}
 	if platformMode {
 		fmt.Fprintln(out)
-		for i, record := range records {
-			fmt.Fprintf(out, "  Cover %d/%d — copy into your messaging app:\n", i+1, len(records))
-			fmt.Fprintln(out)
-			fmt.Fprintf(out, "  %s\n", record.Encrypted)
-			fmt.Fprintln(out)
-		}
+		fmt.Fprintln(out, "  ┌─── COPY into your messaging app ───┐")
 		if len(records) > 1 {
-			if budget, budgetErr := chain.EncodingBudget([]byte(plaintext)); budgetErr == nil {
-				fmt.Fprintf(out, "  budget: packed=%d sealed=%d chunks=%d top_n capacity profile\n", budget.PackedBytes, budget.SealedBytes, budget.ChunkCount)
-			}
+			fmt.Fprintln(out, "  (each paragraph below is one chat bubble — send in order)")
 		}
+		fmt.Fprintln(out)
+		for i, record := range records {
+			if i > 0 {
+				fmt.Fprintln(out)
+			}
+			fmt.Fprintf(out, "  %s\n", record.Encrypted)
+		}
+		fmt.Fprintln(out)
 		fmt.Fprintln(out, "  └─── END — send as "+sender+" ───────────────┘")
 		fmt.Fprintln(out)
 	} else {

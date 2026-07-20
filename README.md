@@ -133,15 +133,15 @@ Just type your secret message:
 alex> Hey, can we meet tomorrow at noon?
   ⏳ Generating cover text...
 
-  Cover 1/1 — copy into your messaging app:
+  ┌─── COPY into your messaging app ───┐
 
   I was thinking about trying that new place downtown.
   Have you been there before? I heard they have great pasta.
 
-  └─── END — send as alex ───────────────────┘
+  └─── END — send as alex ───────────────┘
 ```
 
-Copy each cover into WhatsApp/Telegram/Signal in order. Longer secrets may produce multiple covers (`Cover 1/3`, `Cover 2/3`, …); paste every cover, still in order.
+Copy into WhatsApp/Telegram/Signal. Longer secrets may show as several paragraphs; send each paragraph as its own chat bubble, in order.
 
 ### 5. Receive a message
 

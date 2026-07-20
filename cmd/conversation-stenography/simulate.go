@@ -176,10 +176,15 @@ func simulateConversation(ctx context.Context, in io.Reader, out, errOut io.Writ
 		}
 
 		fmt.Fprintln(out)
-		fmt.Fprintln(out, "  Cover text (what the messaging app would see):")
+		fmt.Fprintln(out, "  What the messaging app would see:")
+		fmt.Fprintln(out)
 		for i, record := range records {
-			fmt.Fprintf(out, "  Cover %d/%d:\n  %s\n\n", i+1, len(records), record.Encrypted)
+			if i > 0 {
+				fmt.Fprintln(out)
+			}
+			fmt.Fprintf(out, "  %s\n", record.Encrypted)
 		}
+		fmt.Fprintln(out)
 		fmt.Fprintf(out, "  %s decoded: %s\n\n", otherName, decoded)
 		history = append(history, fmt.Sprintf("%s → %s: %s", activeName, otherName, plaintext))
 		activeName, otherName = otherName, activeName
