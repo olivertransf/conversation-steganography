@@ -67,7 +67,8 @@ Enter your shared secret phrase when prompted. The terminal starts as Alice:
 Alice> Meet me outside at six.
   Generating and transporting cover text...
 
-  Cover text (what the messaging app would see):
+  What the messaging app would see:
+
   <innocent-looking generated message>
 
   Bob decoded: Meet me outside at six.
