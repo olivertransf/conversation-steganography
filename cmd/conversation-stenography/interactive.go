@@ -235,19 +235,18 @@ func interactiveSend(ctx context.Context, out, errOut io.Writer, chain *conversa
 	}
 	if platformMode {
 		fmt.Fprintln(out)
-		fmt.Fprintln(out, "  ┌─── COPY into your messaging app ───┐")
 		if len(records) > 1 {
-			fmt.Fprintln(out, "  (each paragraph below is one chat bubble — send in order)")
+			fmt.Fprintln(out, "  (each paragraph is one chat bubble — send in order)")
 		}
-		fmt.Fprintln(out)
+		fmt.Fprintln(out, "----- copy -----")
 		for i, record := range records {
 			if i > 0 {
 				fmt.Fprintln(out)
 			}
-			fmt.Fprintf(out, "  %s\n", record.Encrypted)
+			fmt.Fprintln(out, record.Encrypted)
 		}
-		fmt.Fprintln(out)
-		fmt.Fprintln(out, "  └─── END — send as "+sender+" ───────────────┘")
+		fmt.Fprintln(out, "----- end copy -----")
+		fmt.Fprintln(out, "  send as "+sender)
 		fmt.Fprintln(out)
 	} else {
 		for _, record := range records {

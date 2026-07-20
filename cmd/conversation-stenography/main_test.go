@@ -322,7 +322,7 @@ func TestSimulateManualDoesNotAutoDecode(t *testing.T) {
 	if strings.Contains(text, "decoded:") {
 		t.Fatalf("manual mode auto-decoded:\n%s", text)
 	}
-	if !strings.Contains(text, "/paste") {
-		t.Fatalf("missing paste hint:\n%s", text)
+	if !strings.Contains(text, "/paste") && !strings.Contains(text, "paste>") {
+		t.Fatalf("missing paste prompt:\n%s", text)
 	}
 }

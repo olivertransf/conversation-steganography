@@ -116,8 +116,8 @@ func simulateConversation(ctx context.Context, in io.Reader, out, errOut io.Writ
 	fmt.Fprintln(out, "  └──────────────────────────────────────────┘")
 	fmt.Fprintf(out, "  %s and %s are independent simulated participants.\n", userA, userB)
 	if manual {
-		fmt.Fprintln(out, "  Manual mode: sends show cover text only.")
-		fmt.Fprintln(out, "  /paste to decode as the other person (finish with /end).")
+		fmt.Fprintln(out, "  Manual mode: copy the cover text, then paste it back to decode.")
+		fmt.Fprintln(out, "  After each send you are prompted to paste (blank line or /end).")
 		fmt.Fprintln(out, "  Use /switch, /show, or /quit.")
 	} else {
 		fmt.Fprintln(out, "  Type a secret message; the other user will decode it.")
@@ -152,7 +152,7 @@ func simulateConversation(ctx context.Context, in io.Reader, out, errOut io.Writ
 			continue
 		case line == "/help":
 			if manual {
-				fmt.Fprintln(out, "  Type a message to send cover text; /paste [SENDER] decodes a pasted cover (/end); /switch changes speaker; /show history; /quit exits.")
+				fmt.Fprintln(out, "  Type a secret to send; copy the cover block and paste when prompted (blank line or /end). /paste [SENDER] also works. /switch, /show, /quit.")
 			} else {
 				fmt.Fprintln(out, "  Type a message to send it; /switch changes speaker; /show displays plaintext history; /quit exits.")
 			}
@@ -173,28 +173,9 @@ func simulateConversation(ctx context.Context, in io.Reader, out, errOut io.Writ
 				fmt.Fprintln(errOut, "  Paste as the recipient; /switch first if needed.")
 				continue
 			}
-			fmt.Fprintln(out)
-			fmt.Fprintf(out, "  Paste the cover text from %s, then /end:\n", sender)
-			fmt.Fprintln(out)
-			carrier, ok := readInteractiveBlock(scanner)
-			if !ok {
-				return scanner.Err()
+			if err := simulateManualPaste(ctx, scanner, out, errOut, activeChain, sender, activeName, &history); err != nil {
+				return err
 			}
-			fmt.Fprint(out, "  Decoding...")
-			doneProgress := withChainProgress(activeChain, out, "Decoding")
-			decoded, done, status, err := activeChain.ReceiveMessage(ctx, sender, carrier)
-			doneProgress()
-			fmt.Fprint(out, "\r\033[K")
-			if err != nil {
-				fmt.Fprintln(errOut, "  ⚠ Could not decode:", err)
-				continue
-			}
-			if !done {
-				fmt.Fprintf(out, "\n  Waiting for part %d/%d (sync %s). Paste the next paragraph.\n\n", status.Part+1, status.Total, status.SyncCode)
-				continue
-			}
-			fmt.Fprintf(out, "\n  📩 Message from %s:\n  %s\n\n", sender, decoded)
-			history = append(history, fmt.Sprintf("%s → %s: %s", sender, activeName, decoded))
 			continue
 		case line == "":
 			fmt.Fprintln(errOut, "  Message cannot be empty.")
@@ -213,22 +194,16 @@ func simulateConversation(ctx context.Context, in io.Reader, out, errOut io.Writ
 			return fmt.Errorf("%s send: %w", activeName, err)
 		}
 		lastSender = activeName
-
-		fmt.Fprintln(out)
-		fmt.Fprintln(out, "  What the messaging app would see:")
-		fmt.Fprintln(out)
-		for i, record := range records {
-			if i > 0 {
-				fmt.Fprintln(out)
-			}
-			fmt.Fprintf(out, "  %s\n", record.Encrypted)
-		}
-		fmt.Fprintln(out)
+		printCopyableCovers(out, records)
 
 		if manual {
-			fmt.Fprintf(out, "  Switched to %s — /paste to decode (each paragraph separately if there are several).\n\n", otherName)
+			sender := activeName
 			activeName, otherName = otherName, activeName
 			activeChain, otherChain = otherChain, activeChain
+			fmt.Fprintf(out, "  Now %s — paste the cover text below (blank line or /end when done).\n", activeName)
+			if err := simulateManualPaste(ctx, scanner, out, errOut, activeChain, sender, activeName, &history); err != nil {
+				return err
+			}
 			continue
 		}
 
@@ -259,5 +234,74 @@ func simulateConversation(ctx context.Context, in io.Reader, out, errOut io.Writ
 		history = append(history, fmt.Sprintf("%s → %s: %s", activeName, otherName, line))
 		activeName, otherName = otherName, activeName
 		activeChain, otherChain = otherChain, activeChain
+	}
+}
+
+func printCopyableCovers(out io.Writer, records []conversationstenography.ChainRecord) {
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, "----- copy -----")
+	for i, record := range records {
+		if i > 0 {
+			fmt.Fprintln(out)
+		}
+		fmt.Fprintln(out, record.Encrypted)
+	}
+	fmt.Fprintln(out, "----- end copy -----")
+	if len(records) > 1 {
+		fmt.Fprintln(out, "(multiple paragraphs: paste one at a time, in order)")
+	}
+	fmt.Fprintln(out)
+}
+
+// readCoverPaste reads pasted cover text until /end or a blank line after content.
+func readCoverPaste(scanner *bufio.Scanner) (string, bool) {
+	var lines []string
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "/end" {
+			return strings.Join(lines, "\n"), true
+		}
+		if line == "" {
+			if len(lines) == 0 {
+				continue
+			}
+			return strings.Join(lines, "\n"), true
+		}
+		lines = append(lines, line)
+	}
+	if len(lines) > 0 {
+		return strings.Join(lines, "\n"), true
+	}
+	return "", false
+}
+
+func simulateManualPaste(ctx context.Context, scanner *bufio.Scanner, out, errOut io.Writer, chain *conversationstenography.ConversationChain, sender, recipient string, history *[]string) error {
+	for {
+		fmt.Fprintf(out, "paste> ")
+		carrier, ok := readCoverPaste(scanner)
+		if !ok {
+			return scanner.Err()
+		}
+		if strings.TrimSpace(carrier) == "" {
+			fmt.Fprintln(errOut, "  Empty paste; try again.")
+			continue
+		}
+		fmt.Fprint(out, "  Decoding...")
+		doneProgress := withChainProgress(chain, out, "Decoding")
+		decoded, done, status, err := chain.ReceiveMessage(ctx, sender, carrier)
+		doneProgress()
+		fmt.Fprint(out, "\r\033[K")
+		if err != nil {
+			fmt.Fprintln(errOut, "  ⚠ Could not decode:", err)
+			fmt.Fprintln(out, "  Paste again (one paragraph), then blank line or /end.")
+			continue
+		}
+		if !done {
+			fmt.Fprintf(out, "  Got part — waiting for %d/%d. Paste the next paragraph.\n", status.Part+1, status.Total)
+			continue
+		}
+		fmt.Fprintf(out, "\n  📩 Message from %s:\n  %s\n\n", sender, decoded)
+		*history = append(*history, fmt.Sprintf("%s → %s: %s", sender, recipient, decoded))
+		return nil
 	}
 }
