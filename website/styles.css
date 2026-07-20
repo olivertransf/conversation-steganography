@@ -101,7 +101,10 @@ a {
 
 .hero-inner {
   position: relative;
-  width: min(100%, 40rem);
+  width: min(100%, 42rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
 }
 
@@ -109,25 +112,41 @@ a {
   margin: 0 0 1.25rem;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: clamp(2.4rem, 7vw, 4.6rem);
-  line-height: 0.95;
-  letter-spacing: -0.04em;
+  font-size: clamp(2.35rem, 6.2vw, 3.9rem);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  /* Syne + tracking: last-glyph spacing makes the block look left-shifted */
+  padding-inline-start: 0.02em;
+}
+
+.brand span {
+  display: block;
+  text-align: center;
+  width: 100%;
 }
 
 .hero h1 {
-  margin: 0 auto 1rem;
+  margin: 0 0 1rem;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: clamp(1.45rem, 3.4vw, 2.1rem);
-  line-height: 1.2;
-  max-width: 18ch;
+  font-size: clamp(1.35rem, 3vw, 1.85rem);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  max-width: 22ch;
+  text-wrap: balance;
 }
 
 .lede {
-  margin: 0 auto 1.75rem;
+  margin: 0 0 1.75rem;
   color: rgba(232, 238, 244, 0.72);
   font-size: 1.05rem;
-  max-width: 36rem;
+  max-width: 34rem;
+  text-wrap: pretty;
 }
 
 .hero-actions {
