@@ -406,7 +406,7 @@ func (c *ConversationChain) messageConfig(from string) GenerativeConfig {
 	continuation := sameSenderContinuation(c.records, from)
 	system := cfg.ChainSystem
 	if continuation && system != "" {
-		system += "\n\nImportant: this is a back-to-back follow-up from the same person. Advance one coherent thought with new content; do not rewrite the prior message in different words."
+		system += "\n\nImportant: this is a back-to-back follow-up from the same person. Advance one coherent thought with new content; do not rewrite the prior message in different words. Do not open with the same starter as the previous message (avoid stacking I just / I was / So yeah openers)."
 	}
 	if cfg.ChainSystem != "" {
 		var transcript strings.Builder
@@ -444,10 +444,11 @@ func sameSenderContinuation(records []ChainRecord, from string) bool {
 }
 
 func carrierReplyInstruction(continuation bool) string {
+	const openerVariety = "Vary how the message starts — jump into a detail, a question, a reaction, or mid-thought. Avoid stock openers like \"I just\", \"I was just\", \"I thought\", \"So I\", or \"Guess what\"."
 	if continuation {
-		return "The current participant is sending another message immediately after their own previous one. Continue as one coherent train of thought with a new beat — fresh detail, small tangent, or next step. Topic can be anything ordinary. Do not rephrase the previous message or reuse its sentence pattern. Write only the message text: no name, label, signature, or transcript."
+		return "The current participant is sending another message immediately after their own previous one. Continue as one coherent train of thought with a new beat — fresh detail, small tangent, or next step. Topic can be anything ordinary. Do not rephrase the previous message or reuse its sentence pattern. " + openerVariety + " Write only the message text: no name, label, signature, or transcript."
 	}
-	return "Write only one natural chat message by the current participant. Topic can be anything ordinary (plans, food, work, a random observation). Prefer concrete detail over generic small talk. Do not include a name, label, signature, or transcript."
+	return "Write only one natural chat message by the current participant. Topic can be anything ordinary (plans, food, work, a random observation). Prefer concrete detail over generic small talk. " + openerVariety + " Do not include a name, label, signature, or transcript."
 }
 
 func escapePromptControl(text string) string { return strings.ReplaceAll(text, "<|", "< |") }

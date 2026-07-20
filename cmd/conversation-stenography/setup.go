@@ -70,7 +70,7 @@ var modelCatalog = []modelChoice{
 // defaultPromptForModel returns a reasonable default prompt for the given runtime.
 func defaultPromptForModel(m modelChoice) string {
 	if strings.Contains(strings.ToLower(m.HuggingFace), "llama") {
-		return "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nWrite only one cohesive, concise message to a close friend. Stay on the current topic, make each sentence follow naturally from the last, and ask at most one question. Use ordinary casual language. Never repeat a point, invent people, add labels, or mention instructions or hidden data.<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nHey! How was your day?<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\nPretty good, I just got home. How about yours?<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nNot bad. I finally watched that movie we talked about.<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+		return "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nWrite only one cohesive, concise message to a close friend. Stay on the current topic, make each sentence follow naturally from the last, and ask at most one question. Use ordinary casual language. Vary openings; avoid stacking I just / I thought starters. Never repeat a point, invent people, add labels, or mention instructions or hidden data.<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nHey! How was your day?<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\nPretty good — traffic was light for once. How about yours?<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nNot bad. Finally watched that movie we talked about.<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
 	}
 	return "The weather today is"
 }
@@ -78,7 +78,7 @@ func defaultPromptForModel(m modelChoice) string {
 // defaultChainSystemForModel returns a reasonable default chain_system prompt.
 func defaultChainSystemForModel(m modelChoice) string {
 	if strings.Contains(strings.ToLower(m.HuggingFace), "llama") {
-		return "Write a natural chat message to a close friend in casual language. Topic can be anything ordinary. Prefer 2 to 5 sentences with concrete detail. If sending right after your own prior message, advance that thought — do not rephrase it. At most one question. No lists, labels, sign-offs, or repetition. Output only the message text."
+		return "Write a natural chat message to a close friend in casual language. Topic can be anything ordinary. Prefer 2 to 5 sentences with concrete detail. Vary openings; do not start with I just / I was just / I thought / So I. If sending right after your own prior message, advance that thought — do not rephrase it or reuse its opener. At most one question. No lists, labels, sign-offs, or repetition. Output only the message text."
 	}
 	return ""
 }

@@ -708,7 +708,7 @@ func TestContinuationPromptAdvancesThought(t *testing.T) {
 	chain := newTestChain(t, "friends")
 	chain.baseConfig.ChainSystem = "Write a casual reply."
 	open := chain.messageConfig("alice").Prompt
-	if !strings.Contains(open, "Topic can be anything ordinary") {
+	if !strings.Contains(open, "Topic can be anything ordinary") || !strings.Contains(open, "Vary how the message starts") {
 		t.Fatalf("opening prompt missing variety cue: %q", open)
 	}
 	if strings.Contains(open, "back-to-back follow-up") {
@@ -716,7 +716,7 @@ func TestContinuationPromptAdvancesThought(t *testing.T) {
 	}
 	chain.records = []ChainRecord{{From: "alice", Encrypted: "I grabbed coffee on the way in."}}
 	cont := chain.messageConfig("alice").Prompt
-	if !strings.Contains(cont, "coherent train of thought") || !strings.Contains(cont, "back-to-back follow-up") {
+	if !strings.Contains(cont, "coherent train of thought") || !strings.Contains(cont, "back-to-back follow-up") || !strings.Contains(cont, "I just") {
 		t.Fatalf("continuation prompt missing cues: %q", cont)
 	}
 	if strings.Contains(cont, "alice") {
