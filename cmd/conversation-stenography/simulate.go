@@ -27,6 +27,7 @@ func runSimulation(args []string, in io.Reader, out, errOut io.Writer) error {
 	conversation := fs.String("conversation", "local-simulation", "simulation conversation identifier")
 	secret := fs.String("secret", "", "shared phrase (skips prompt; overrides env)")
 	devSecret := fs.Bool("dev-secret", false, "use built-in local-dev phrase (skips prompt; not for real chats)")
+	manual := fs.Bool("manual", false, "do not auto-decode; /paste covers as the other person")
 	modelName := fs.String("model", envOr("CONVERSATION_STENOGRAPHY_MODEL", local.Model), "Hugging Face model name or local directory")
 	revision := fs.String("revision", envOr("CONVERSATION_STENOGRAPHY_REVISION", defaultString(local.Revision, "main")), "pinned model revision")
 	python := fs.String("python", envOr("CONVERSATION_STENOGRAPHY_PYTHON", defaultString(local.Python, "python3")), "Python interpreter")
@@ -100,10 +101,10 @@ func runSimulation(args []string, in io.Reader, out, errOut io.Writer) error {
 		return err
 	}
 	second.SetCapacityOptions(local.MaxCoverChars, resolveCapacityTopN(local.CapacityTopN, local.TopN), local.CapacityLengthBias)
-	return simulateConversation(ctx, in, out, errOut, first, second, *userA, *userB)
+	return simulateConversation(ctx, in, out, errOut, first, second, *userA, *userB, *manual)
 }
 
-func simulateConversation(ctx context.Context, in io.Reader, out, errOut io.Writer, first, second *conversationstenography.ConversationChain, userA, userB string) error {
+func simulateConversation(ctx context.Context, in io.Reader, out, errOut io.Writer, first, second *conversationstenography.ConversationChain, userA, userB string, manual bool) error {
 	scanner := bufio.NewScanner(in)
 	scanner.Buffer(make([]byte, 4096), 16*1024*1024)
 	activeName, otherName := userA, userB
@@ -114,51 +115,116 @@ func simulateConversation(ctx context.Context, in io.Reader, out, errOut io.Writ
 	fmt.Fprintln(out, "  │       🧪  Two-user local simulation      │")
 	fmt.Fprintln(out, "  └──────────────────────────────────────────┘")
 	fmt.Fprintf(out, "  %s and %s are independent simulated participants.\n", userA, userB)
-	fmt.Fprintln(out, "  Type a secret message; the other user will decode it.")
-	fmt.Fprintln(out, "  Turns alternate automatically. Use /switch, /show, or /quit.")
+	if manual {
+		fmt.Fprintln(out, "  Manual mode: sends show cover text only.")
+		fmt.Fprintln(out, "  /paste to decode as the other person (finish with /end).")
+		fmt.Fprintln(out, "  Use /switch, /show, or /quit.")
+	} else {
+		fmt.Fprintln(out, "  Type a secret message; the other user will decode it.")
+		fmt.Fprintln(out, "  Turns alternate automatically. Use /switch, /show, or /quit.")
+	}
 	fmt.Fprintln(out)
 
 	var history []string
+	lastSender := ""
 	for {
 		fmt.Fprintf(out, "%s> ", activeName)
 		if !scanner.Scan() {
 			return scanner.Err()
 		}
-		plaintext := scanner.Text()
-		switch plaintext {
-		case "/quit", "/exit":
+		line := scanner.Text()
+		switch {
+		case line == "/quit" || line == "/exit":
 			fmt.Fprintln(out, "  Simulation ended; no conversation state was saved.")
 			return nil
-		case "/switch":
+		case line == "/switch":
 			activeName, otherName = otherName, activeName
 			activeChain, otherChain = otherChain, activeChain
 			continue
-		case "/show":
+		case line == "/show":
 			if len(history) == 0 {
 				fmt.Fprintln(out, "  No simulated messages yet.")
 			} else {
-				for _, line := range history {
-					fmt.Fprintln(out, "  "+line)
+				for _, entry := range history {
+					fmt.Fprintln(out, "  "+entry)
 				}
 			}
 			continue
-		case "/help":
-			fmt.Fprintln(out, "  Type a message to send it; /switch changes speaker; /show displays plaintext history; /quit exits.")
+		case line == "/help":
+			if manual {
+				fmt.Fprintln(out, "  Type a message to send cover text; /paste [SENDER] decodes a pasted cover (/end); /switch changes speaker; /show history; /quit exits.")
+			} else {
+				fmt.Fprintln(out, "  Type a message to send it; /switch changes speaker; /show displays plaintext history; /quit exits.")
+			}
 			continue
-		case "":
+		case line == "/paste" || strings.HasPrefix(line, "/paste "):
+			if !manual {
+				fmt.Fprintln(errOut, "  /paste is only available with -manual.")
+				continue
+			}
+			sender := strings.TrimSpace(strings.TrimPrefix(line, "/paste"))
+			if sender == "" {
+				sender = lastSender
+			}
+			if sender == "" {
+				sender = otherName
+			}
+			if sender == activeName {
+				fmt.Fprintln(errOut, "  Paste as the recipient; /switch first if needed.")
+				continue
+			}
+			fmt.Fprintln(out)
+			fmt.Fprintf(out, "  Paste the cover text from %s, then /end:\n", sender)
+			fmt.Fprintln(out)
+			carrier, ok := readInteractiveBlock(scanner)
+			if !ok {
+				return scanner.Err()
+			}
+			decoded, done, status, err := activeChain.ReceiveMessage(ctx, sender, carrier)
+			if err != nil {
+				fmt.Fprintln(errOut, "  ⚠ Could not decode:", err)
+				continue
+			}
+			if !done {
+				fmt.Fprintf(out, "\n  Waiting for part %d/%d (sync %s). Paste the next paragraph.\n\n", status.Part+1, status.Total, status.SyncCode)
+				continue
+			}
+			fmt.Fprintf(out, "\n  📩 Message from %s:\n  %s\n\n", sender, decoded)
+			history = append(history, fmt.Sprintf("%s → %s: %s", sender, activeName, decoded))
+			continue
+		case line == "":
 			fmt.Fprintln(errOut, "  Message cannot be empty.")
 			continue
-		}
-		if strings.HasPrefix(plaintext, "/") {
+		case strings.HasPrefix(line, "/"):
 			fmt.Fprintln(errOut, "  Unknown command. Type /help for commands.")
 			continue
 		}
 
-		fmt.Fprintln(out, "  Generating and transporting cover text...")
-		records, err := activeChain.SendMessage(ctx, activeName, []byte(plaintext))
+		fmt.Fprintln(out, "  Generating cover text...")
+		records, err := activeChain.SendMessage(ctx, activeName, []byte(line))
 		if err != nil {
 			return fmt.Errorf("%s send: %w", activeName, err)
 		}
+		lastSender = activeName
+
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, "  What the messaging app would see:")
+		fmt.Fprintln(out)
+		for i, record := range records {
+			if i > 0 {
+				fmt.Fprintln(out)
+			}
+			fmt.Fprintf(out, "  %s\n", record.Encrypted)
+		}
+		fmt.Fprintln(out)
+
+		if manual {
+			fmt.Fprintf(out, "  Switched to %s — /paste to decode (each paragraph separately if there are several).\n\n", otherName)
+			activeName, otherName = otherName, activeName
+			activeChain, otherChain = otherChain, activeChain
+			continue
+		}
+
 		var decoded []byte
 		var done bool
 		for i, record := range records {
@@ -174,19 +240,8 @@ func simulateConversation(ctx context.Context, in io.Reader, out, errOut io.Writ
 		if !done {
 			return errors.New("simulation logical message incomplete after all covers")
 		}
-
-		fmt.Fprintln(out)
-		fmt.Fprintln(out, "  What the messaging app would see:")
-		fmt.Fprintln(out)
-		for i, record := range records {
-			if i > 0 {
-				fmt.Fprintln(out)
-			}
-			fmt.Fprintf(out, "  %s\n", record.Encrypted)
-		}
-		fmt.Fprintln(out)
 		fmt.Fprintf(out, "  %s decoded: %s\n\n", otherName, decoded)
-		history = append(history, fmt.Sprintf("%s → %s: %s", activeName, otherName, plaintext))
+		history = append(history, fmt.Sprintf("%s → %s: %s", activeName, otherName, line))
 		activeName, otherName = otherName, activeName
 		activeChain, otherChain = otherChain, activeChain
 	}

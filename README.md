@@ -58,10 +58,12 @@ You do not need two computers or phones to verify that Conversation Stenography 
 setup, start a local two-person simulation:
 
 ```sh
-./conversation-stenography simulate
+./conversation-stenography simulate -dev-secret
+# Manual paste/decode (no auto-decode):
+./conversation-stenography simulate -dev-secret -manual
 ```
 
-Enter your shared secret phrase when prompted. The terminal starts as Alice:
+Enter your shared secret phrase when prompted (or use `-dev-secret` / `-secret`). The terminal starts as Alice:
 
 ```text
 Alice> Meet me outside at six.
@@ -85,6 +87,7 @@ Simulation commands:
 
 | Command | What it does |
 |---|---|
+| `/paste [SENDER]` | Manual mode only: paste a cover to decode (`/end`) |
 | `/switch` | Switch the active user without sending |
 | `/show` | Show the simulated plaintext conversation |
 | `/help` | Show simulation help |

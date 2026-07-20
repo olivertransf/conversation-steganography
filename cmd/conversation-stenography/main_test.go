@@ -254,7 +254,7 @@ func TestSimulateConversationRoundTripAndAlternates(t *testing.T) {
 	bob.SetCapacityOptions(600, 8, 0)
 	var out, errOut bytes.Buffer
 	input := strings.NewReader("hello bob\nhello alice\n/show\n/quit\n")
-	if err := simulateConversation(context.Background(), input, &out, &errOut, alice, bob, "Alice", "Bob"); err != nil {
+	if err := simulateConversation(context.Background(), input, &out, &errOut, alice, bob, "Alice", "Bob", false); err != nil {
 		t.Fatal(err)
 	}
 	text := out.String()
@@ -296,5 +296,33 @@ func TestSimulateRejectsSecretAndDevSecret(t *testing.T) {
 	err := run([]string{"simulate", "-dev-secret", "-secret", "x", "-user-a", "A", "-user-b", "B"}, strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "either -dev-secret or -secret") {
 		t.Fatalf("expected flag conflict, got %v", err)
+	}
+}
+
+
+func TestSimulateManualDoesNotAutoDecode(t *testing.T) {
+	key := []byte("0123456789abcdef0123456789abcdef")
+	cfg := conversationstenography.GenerativeConfig{Prompt: "P", TopN: 8, Coding: "arithmetic", Temperature: 1}
+	alice, err := conversationstenography.NewConversationChain(simulationTestModel{}, key, "simulation-manual", cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alice.SetCapacityOptions(600, 8, 0)
+	bob, err := conversationstenography.NewConversationChain(simulationTestModel{}, key, "simulation-manual", cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob.SetCapacityOptions(600, 8, 0)
+	var out, errOut bytes.Buffer
+	input := strings.NewReader("hello bob\n/quit\n")
+	if err := simulateConversation(context.Background(), input, &out, &errOut, alice, bob, "Alice", "Bob", true); err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	if strings.Contains(text, "decoded:") {
+		t.Fatalf("manual mode auto-decoded:\n%s", text)
+	}
+	if !strings.Contains(text, "/paste") {
+		t.Fatalf("missing paste hint:\n%s", text)
 	}
 }
