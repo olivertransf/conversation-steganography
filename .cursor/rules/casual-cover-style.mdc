@@ -16,3 +16,7 @@ When editing prompts (`chain_system`, `prompt`, `carrierReplyInstruction`, seman
 - Keep opener variety rules
 - Update `conversation-stenography.local.json` when changing defaults so local runs match
 - Peers must share the same generative prompt config or decode breaks
+
+# How-it-works docs
+
+When expanding `website/` educational content, prefer concrete worked examples and the core teaching point: ciphertext bits select among the model’s top next-token candidates; they are not painted into the letters.

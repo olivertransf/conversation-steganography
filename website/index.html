@@ -25,7 +25,7 @@
       </p>
       <div class="hero-actions">
         <a class="btn primary" href="#walkthrough">Walk the pipeline</a>
-        <a class="btn ghost" href="#visibility">Public vs private</a>
+        <a class="btn ghost" href="#token-lab">Core trick: bits → tokens</a>
       </div>
     </div>
   </header>
@@ -66,17 +66,65 @@
 
           <div class="detail-grid">
             <div>
-              <h3>What happens</h3>
+              <h3>In plain English</h3>
               <div id="step-detail"></div>
             </div>
             <div>
-              <h3>Why it matters</h3>
+              <h3>Worked example</h3>
+              <div id="step-example" class="example-box"></div>
+              <h3 class="spaced">Why this step exists</h3>
               <div id="step-why"></div>
               <h3 class="spaced">Code landmarks</h3>
               <ul class="code-list" id="step-files"></ul>
             </div>
           </div>
         </article>
+      </div>
+    </section>
+
+    <section id="one-message" class="one-message">
+      <div class="section-inner">
+        <h2>Follow one message all the way through</h2>
+        <p class="section-lede">
+          Same toy numbers reused below. Values are simplified for teaching; real runs use full AES-SIV tags and longer bitstreams.
+        </p>
+        <ol class="story">
+          <li>
+            <strong>You type</strong>
+            <code>meet at noon</code>
+            <span>Plaintext stays on your laptop.</span>
+          </li>
+          <li>
+            <strong>Pack</strong>
+            <code>mode=1 · packed ≈ shorter bytes</code>
+            <span>Tool tries several compressors; keep the smallest.</span>
+          </li>
+          <li>
+            <strong>Seal</strong>
+            <code>tag(16) || ciphertext</code>
+            <span>AES-SIV with AAD binding conversation, sender, chain hash, pack mode.</span>
+          </li>
+          <li>
+            <strong>Chunk</strong>
+            <code>wire0 = [0,1,sealedLen,len,P0]</code>
+            <span>If the sealed blob is big, you get wire0, wire1, … each becomes one bubble.</span>
+          </li>
+          <li>
+            <strong>Encode</strong>
+            <code>bits(wire) choose tokens</code>
+            <span>Model says top tokens; secret bits pick among them → cover text.</span>
+          </li>
+          <li>
+            <strong>WhatsApp shows</strong>
+            <code>yeah traffic was light for once…</code>
+            <span>No ciphertext visible. Friend copies the exact text.</span>
+          </li>
+          <li>
+            <strong>Decode</strong>
+            <code>same prompt → same candidates → recover bits</code>
+            <span>Join pieces, openSIV, unpack → <code>meet at noon</code>.</span>
+          </li>
+        </ol>
       </div>
     </section>
 
@@ -124,24 +172,50 @@
 
     <section id="token-lab" class="token-lab">
       <div class="section-inner">
-        <h2>Token selection lab</h2>
+        <h2>The core trick: bits pick the next word</h2>
         <p class="section-lede">
-          At each step the local model proposes likely next tokens. An arithmetic
-          coder spends secret bits to pick among the top candidates, so the cover
-          stays fluent while carrying ciphertext.
+          This is usually the confusing part. The ciphertext is <em>not</em> stuffed
+          into the letters. It controls <em>which</em> of the model’s likely next
+          tokens you emit. Your friend, with the same model and chat history, rebuilds
+          the same candidate list and reads the bits back out from which token appeared.
         </p>
+        <div class="explain-grid">
+          <div class="explain-card">
+            <h3>Sender</h3>
+            <ol class="micro">
+              <li>Ask the model: “given this prompt, what tokens are likely next?”</li>
+              <li>Keep the top N (say 32), turn scores into slice sizes on a number line.</li>
+              <li>Read secret bits as a point on that line; emit the token whose slice contains it.</li>
+              <li>Append that token to the cover; repeat until the wire bits are spent.</li>
+            </ol>
+          </div>
+          <div class="explain-card">
+            <h3>Receiver</h3>
+            <ol class="micro">
+              <li>Build the <em>exact same</em> prompt from the shared transcript.</li>
+              <li>Ask the same model for the same top-N list.</li>
+              <li>See which token actually appears in the pasted cover.</li>
+              <li>That slice tells you which bits were used; append them; continue.</li>
+            </ol>
+          </div>
+        </div>
         <div class="lab">
           <div class="lab-controls">
             <label>
-              Secret bit stream
+              Pretend secret bits (from ciphertext)
               <input id="bit-input" type="text" value="10110010" maxlength="16" spellcheck="false" />
             </label>
-            <button type="button" class="btn primary compact" id="run-lab">Step once</button>
+            <button type="button" class="btn primary compact" id="run-lab">Spend bits → pick token</button>
             <button type="button" class="btn ghost compact" id="reset-lab">Reset</button>
           </div>
-          <p class="lab-status" id="lab-status">Press Step once to pick the next cover token from the candidate pool.</p>
+          <p class="lab-status" id="lab-status">Press the button. Watch which candidate slice the bits land in.</p>
+          <div class="ruler" id="bit-ruler" aria-hidden="true"></div>
           <ol class="candidate-list" id="candidate-list"></ol>
           <p class="cover-build">Cover so far: <span id="cover-so-far">…</span></p>
+          <p class="lab-note">
+            Real code uses arithmetic coding over a fixed total of 32768 slots (see <code>arithmetic.go</code>),
+            not this simplified number-line demo — same idea, more precise.
+          </p>
         </div>
       </div>
     </section>
