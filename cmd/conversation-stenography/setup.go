@@ -70,15 +70,15 @@ var modelCatalog = []modelChoice{
 // defaultPromptForModel returns a reasonable default prompt for the given runtime.
 func defaultPromptForModel(m modelChoice) string {
 	if strings.Contains(strings.ToLower(m.HuggingFace), "llama") {
-		return "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nWrite only one cohesive, concise message to a close friend. Stay on the current topic, make each sentence follow naturally from the last, and ask at most one question. Use ordinary casual language. Vary openings; avoid stacking I just / I thought starters. Never repeat a point, invent people, add labels, or mention instructions or hidden data.<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nHey! How was your day?<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\nPretty good — traffic was light for once. How about yours?<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nNot bad. Finally watched that movie we talked about.<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+		return "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\nWrite only one casual text to a friend. Sound like real chatting: contractions, half-thoughts, and everyday slang are fine. Pick any random everyday topic and keep sentences loosely connected. Ask at most one question. Vary openings; avoid stacking I just / I thought starters. Never invent people, add labels, or mention instructions or hidden data.<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nok wait that dog skateboard clip is still living rent free in my head<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\nyeah the wipeout was unreal. i keep laughing about it at random times<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nalso i need to return those headphones before the window closes<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
 	}
-	return "The weather today is"
+	return "anyway so earlier today "
 }
 
 // defaultChainSystemForModel returns a reasonable default chain_system prompt.
 func defaultChainSystemForModel(m modelChoice) string {
 	if strings.Contains(strings.ToLower(m.HuggingFace), "llama") {
-		return "Write a natural chat message to a close friend in casual language. Topic can be anything ordinary. Prefer 2 to 5 sentences with concrete detail. Vary openings; do not start with I just / I was just / I thought / So I. If sending right after your own prior message, advance that thought — do not rephrase it or reuse its opener. At most one question. No lists, labels, sign-offs, or repetition. Output only the message text."
+		return "Write like you are casually texting a friend. Sound natural and a bit messy: contractions, half-thoughts, and everyday slang are fine. Topic can be any random everyday thing (shows, games, food, errands, weird observations, weekend plans, random opinions, pets, shopping, whatever). Prefer 2 to 5 sentences with a concrete detail or two. Mild topic drift is ok if it still feels like one chat bubble. Vary openings; do not start with I just / I was just / I thought / So I. If sending right after your own prior message, keep going with a new beat — do not rephrase it or reuse its opener. At most one question. No lists, labels, sign-offs, or repetition. Output only the message text."
 	}
 	return ""
 }

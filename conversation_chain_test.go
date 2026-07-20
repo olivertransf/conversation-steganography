@@ -708,7 +708,7 @@ func TestContinuationPromptAdvancesThought(t *testing.T) {
 	chain := newTestChain(t, "friends")
 	chain.baseConfig.ChainSystem = "Write a casual reply."
 	open := chain.messageConfig("alice").Prompt
-	if !strings.Contains(open, "Topic can be anything ordinary") || !strings.Contains(open, "Vary how the message starts") {
+	if !strings.Contains(open, "any random everyday thing") || !strings.Contains(open, "Vary how the message starts") {
 		t.Fatalf("opening prompt missing variety cue: %q", open)
 	}
 	if strings.Contains(open, "back-to-back follow-up") {

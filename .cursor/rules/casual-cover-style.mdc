@@ -1,0 +1,17 @@
+---
+description: Cover messages should sound like casual random-topic texting
+alwaysApply: true
+---
+
+# Casual cover message style
+
+Cover / stego carrier text should read like casual conversation discussing random everyday things, not polished small talk.
+
+When editing prompts (`chain_system`, `prompt`, `carrierReplyInstruction`, semantic judge, sentence refresh):
+
+- Prefer texting vibe: contractions, half-thoughts, everyday slang
+- Broaden topics beyond day/weather/work (shows, games, food, errands, weird observations, weekend plans, opinions, pets, shopping, etc.)
+- Allow mild topic drift inside one bubble; reject only abrupt nonsense
+- Keep opener variety and same-sender continuation coherence rules
+- Update `conversation-stenography.local.json` when changing defaults so local runs match
+- Peers must share the same generative prompt config or decode breaks
