@@ -74,8 +74,8 @@ a {
   min-height: 100dvh;
   color: var(--text);
   display: grid;
-  align-items: end;
-  padding: 2.5rem 1.5rem 4rem;
+  place-items: center;
+  padding: 2.5rem 1.5rem;
   overflow: hidden;
   background:
     radial-gradient(1200px 600px at 12% -10%, rgba(43, 184, 163, 0.2), transparent 55%),
@@ -101,9 +101,8 @@ a {
 
 .hero-inner {
   position: relative;
-  width: min(100%, var(--max));
-  margin: 0 auto;
-  max-width: 40rem;
+  width: min(100%, 40rem);
+  text-align: center;
 }
 
 .brand {
@@ -116,7 +115,7 @@ a {
 }
 
 .hero h1 {
-  margin: 0 0 1rem;
+  margin: 0 auto 1rem;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: clamp(1.45rem, 3.4vw, 2.1rem);
@@ -125,7 +124,7 @@ a {
 }
 
 .lede {
-  margin: 0 0 1.75rem;
+  margin: 0 auto 1.75rem;
   color: rgba(232, 238, 244, 0.72);
   font-size: 1.05rem;
   max-width: 36rem;
@@ -135,6 +134,7 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+  justify-content: center;
 }
 
 .btn {
