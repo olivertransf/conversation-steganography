@@ -54,6 +54,9 @@ type GenerativeConfig struct {
 	// TokenCallback is called with each generated token's text as it is
 	// selected, providing real-time streaming of the carrier generation.
 	TokenCallback func(string)
+	// ProgressCallback reports encode/decode work units. Total may be an
+	// estimate; done reaches total when the payload phase completes.
+	ProgressCallback func(done, total int)
 }
 
 // GenerativeCodec embeds framed bytes in deterministic next-token choices.
@@ -129,6 +132,19 @@ func NewGenerativeCodec(model LanguageModel, cfg GenerativeConfig) (*GenerativeC
 }
 
 func (c *GenerativeCodec) Config() GenerativeConfig { return c.cfg }
+
+func (c *GenerativeCodec) reportProgress(done, total int) {
+	if c.cfg.ProgressCallback == nil {
+		return
+	}
+	if done < 0 {
+		done = 0
+	}
+	if total > 0 && done > total {
+		done = total
+	}
+	c.cfg.ProgressCallback(done, total)
+}
 
 type CarrierMetrics struct {
 	DataTokens        int
@@ -244,6 +260,7 @@ func (c *GenerativeCodec) encode(ctx context.Context, payload []byte, metrics *C
 			if c.cfg.TokenCallback != nil {
 				c.cfg.TokenCallback(candidates[symbol].Text)
 			}
+			c.reportProgress(confirmed, targetBits)
 			generated = append(generated, token)
 			contextTokens = append(contextTokens, token)
 			sinceRefresh++
@@ -293,6 +310,7 @@ func (c *GenerativeCodec) encode(ctx context.Context, payload []byte, metrics *C
 			if c.cfg.TokenCallback != nil {
 				c.cfg.TokenCallback(candidates[selected].Text)
 			}
+			c.reportProgress(bitOffset, len(data)*8)
 			generated = append(generated, token)
 			contextTokens = append(contextTokens, token)
 		}
@@ -368,6 +386,7 @@ func (c *GenerativeCodec) Decode(ctx context.Context, text string) ([]byte, erro
 	bitOffset := 0
 	dataEnd := len(observed)
 	for position, token := range observed {
+		c.reportProgress(position+1, len(observed))
 		candidates, err := c.candidates(ctx, contextTokens, observed[:position])
 		if err != nil {
 			return nil, err
@@ -492,6 +511,7 @@ func (c *GenerativeCodec) DecodeUnframedCandidates(ctx context.Context, text str
 	greedy := make([]bool, len(observed))
 	visible := make([]int, 0, len(observed))
 	for position, token := range observed {
+		c.reportProgress(position+1, len(observed))
 		candidates, err := c.candidates(ctx, contextTokens, visible)
 		if err != nil {
 			return nil, err
@@ -578,6 +598,7 @@ func (c *GenerativeCodec) decodeArithmetic(ctx context.Context, observed, contex
 	visible := make([]int, 0, len(observed))
 	sinceRefresh := 0
 	for position, token := range observed {
+		c.reportProgress(position+1, len(observed))
 		candidates, err := c.candidates(ctx, contextTokens, visible)
 		if err != nil {
 			return nil, err

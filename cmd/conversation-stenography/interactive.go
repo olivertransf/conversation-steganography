@@ -122,7 +122,11 @@ Any other line is encrypted and sent as the active participant.`)
 			if !ok {
 				return scanner.Err()
 			}
+			fmt.Fprint(out, "  ⏳ Decoding...")
+			doneProgress := withChainProgress(chain, out, "Decoding")
 			plaintext, done, status, err := chain.ReceiveMessage(ctx, sender, carrier)
+			doneProgress()
+			fmt.Fprint(out, "\r\033[K")
 			if err != nil {
 				fmt.Fprintln(errOut, "  ⚠ Could not decode:", err)
 				continue
@@ -162,7 +166,11 @@ Any other line is encrypted and sent as the active participant.`)
 				fmt.Fprintln(errOut, "receive failed: record metadata does not match expected order")
 				continue
 			}
+			fmt.Fprint(out, "  Decoding...")
+			doneProgress := withChainProgress(chain, out, "Decoding")
 			plaintext, done, status, err := chain.ReceiveMessage(ctx, incoming.From, incoming.Encrypted)
+			doneProgress()
+			fmt.Fprint(out, "\r\033[K")
 			if err != nil {
 				fmt.Fprintln(errOut, "receive failed:", err)
 				continue
@@ -209,7 +217,9 @@ func interactiveSend(ctx context.Context, out, errOut io.Writer, chain *conversa
 		return nil
 	}
 	fmt.Fprint(out, "  ⏳ Generating cover text...")
+	doneProgress := withChainProgress(chain, out, "Encoding")
 	records, err := chain.SendMessage(ctx, sender, []byte(plaintext))
+	doneProgress()
 	fmt.Fprint(out, "\r\033[K") // clear the thinking indicator
 	if err != nil {
 		fmt.Fprintln(errOut, "  ⚠ Send failed:", err)

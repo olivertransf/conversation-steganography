@@ -180,7 +180,11 @@ func simulateConversation(ctx context.Context, in io.Reader, out, errOut io.Writ
 			if !ok {
 				return scanner.Err()
 			}
+			fmt.Fprint(out, "  Decoding...")
+			doneProgress := withChainProgress(activeChain, out, "Decoding")
 			decoded, done, status, err := activeChain.ReceiveMessage(ctx, sender, carrier)
+			doneProgress()
+			fmt.Fprint(out, "\r\033[K")
 			if err != nil {
 				fmt.Fprintln(errOut, "  ⚠ Could not decode:", err)
 				continue
@@ -200,8 +204,11 @@ func simulateConversation(ctx context.Context, in io.Reader, out, errOut io.Writ
 			continue
 		}
 
-		fmt.Fprintln(out, "  Generating cover text...")
+		fmt.Fprint(out, "  Generating cover text...")
+		doneProgress := withChainProgress(activeChain, out, "Encoding")
 		records, err := activeChain.SendMessage(ctx, activeName, []byte(line))
+		doneProgress()
+		fmt.Fprint(out, "\r\033[K")
 		if err != nil {
 			return fmt.Errorf("%s send: %w", activeName, err)
 		}
@@ -225,18 +232,26 @@ func simulateConversation(ctx context.Context, in io.Reader, out, errOut io.Writ
 			continue
 		}
 
+		fmt.Fprint(out, "  Decoding...")
+		doneDecode := withChainProgress(otherChain, out, "Decoding")
 		var decoded []byte
 		var done bool
 		for i, record := range records {
 			var status conversationstenography.ReceiveStatus
 			decoded, done, status, err = otherChain.ReceiveMessage(ctx, activeName, record.Encrypted)
 			if err != nil {
+				doneDecode()
+				fmt.Fprint(out, "\r\033[K")
 				return fmt.Errorf("%s receive cover %d/%d: %w", otherName, i+1, len(records), err)
 			}
 			if i < len(records)-1 && (done || !status.Waiting) {
+				doneDecode()
+				fmt.Fprint(out, "\r\033[K")
 				return fmt.Errorf("simulation expected waiting after cover %d/%d", i+1, len(records))
 			}
 		}
+		doneDecode()
+		fmt.Fprint(out, "\r\033[K")
 		if !done {
 			return errors.New("simulation logical message incomplete after all covers")
 		}

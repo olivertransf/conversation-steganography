@@ -311,3 +311,24 @@ func TestCandidatePoolAllowsCapacityProfile(t *testing.T) {
 		t.Fatalf("got pool %d", codec.Config().CandidatePool)
 	}
 }
+
+func TestEncodeReportsProgress(t *testing.T) {
+	ctx := context.Background()
+	var lastDone, lastTotal, calls int
+	codec, err := NewGenerativeCodec(fakeModel{"fixture-v1"}, GenerativeConfig{
+		Prompt: "P", TopN: 8, Coding: "arithmetic", Temperature: 1,
+		ProgressCallback: func(done, total int) {
+			calls++
+			lastDone, lastTotal = done, total
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := codec.EncodeUnframedWithMetrics(ctx, []byte{1, 2, 3, 4}); err != nil {
+		t.Fatal(err)
+	}
+	if calls == 0 || lastTotal <= 0 || lastDone < lastTotal {
+		t.Fatalf("progress not completed: calls=%d done=%d total=%d", calls, lastDone, lastTotal)
+	}
+}

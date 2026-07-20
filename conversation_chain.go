@@ -216,6 +216,12 @@ func (c *ConversationChain) SetTokenCallback(fn func(string)) {
 	c.baseConfig.TokenCallback = fn
 }
 
+// SetProgressCallback installs fn for encode/decode progress updates.
+// Pass nil to disable.
+func (c *ConversationChain) SetProgressCallback(fn func(done, total int)) {
+	c.baseConfig.ProgressCallback = fn
+}
+
 // RestorePublic rebuilds rolling prompt, index, sender counters, and hash state
 // from a previously persisted public transcript.
 func (c *ConversationChain) RestorePublic(records []ChainRecord) error {
