@@ -698,7 +698,7 @@ func (c *GenerativeCodec) refreshedContext(ctx context.Context, visibleTokens []
 		return nil, fmt.Errorf("detokenize visible context: %w", err)
 	}
 	prompt := c.cfg.Prompt + visible +
-		"<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nKeep the same casual texting vibe with one more sentence. A small everyday tangent is fine. Do not add labels or formatting.<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+		"<|eot_id|><|start_header_id|>user<|end_header_id|>\n\nContinue the same casual thought with one more sentence that follows naturally. Do not add labels or formatting.<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
 	tokens, err := c.model.Tokenize(ctx, prompt)
 	if err != nil {
 		return nil, fmt.Errorf("refresh sentence context: %w", err)

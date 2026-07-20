@@ -1,17 +1,18 @@
 ---
-description: Cover messages should sound like casual random-topic texting
+description: Cover messages should sound like casual chat that continues cohesively
 alwaysApply: true
 ---
 
 # Casual cover message style
 
-Cover / stego carrier text should read like casual conversation discussing random everyday things, not polished small talk.
+Cover / stego carrier text should read like casual conversation about everyday things, and must continue the ongoing chat cohesively.
 
 When editing prompts (`chain_system`, `prompt`, `carrierReplyInstruction`, semantic judge, sentence refresh):
 
 - Prefer texting vibe: contractions, half-thoughts, everyday slang
-- Broaden topics beyond day/weather/work (shows, games, food, errands, weird observations, weekend plans, opinions, pets, shopping, etc.)
-- Allow mild topic drift inside one bubble; reject only abrupt nonsense
-- Keep opener variety and same-sender continuation coherence rules
+- Broaden available topics beyond day/weather/work, but stay on the current conversational thread
+- React to, answer, or build on prior transcript messages; do not jump topics unless the chat just started
+- Same-sender follow-ups advance one coherent thought with new content (multi-cover coherence)
+- Keep opener variety rules
 - Update `conversation-stenography.local.json` when changing defaults so local runs match
 - Peers must share the same generative prompt config or decode breaks
